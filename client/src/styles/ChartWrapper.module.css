@@ -1,0 +1,97 @@
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalContainer {
+  height: 70vh;
+}
+
+/* Header with title and icons */
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #fff;
+  z-index: 1;
+  border-bottom: 1px solid #e5e7eb;
+  height: 36px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937; 
+  margin: 0;
+}
+
+.spanFlexCenter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Expand and Info Icons */
+.expandIcon {
+  font-size: 16px;
+  color: #1f2937;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.expandIcon:hover {
+  transform: scale(1.1);
+}
+
+.infoIcon {
+  color: #819A91 !important;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 4px;
+  margin-top: 2px;
+}
+
+
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+
+.legend {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 12px;
+  color: #1f2937;
+  margin: 8px 0;
+  background: #fff;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.colorBox {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+
+.chartScrollArea {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  position: relative;
+  padding-top: 2px;
+}

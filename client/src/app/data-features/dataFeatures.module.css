@@ -1,0 +1,19 @@
+.columnBox {
+  padding: 4px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  height: 45vh;
+  min-height: 400px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+
+.configSection {
+  flex: 0 0 auto; /* take space based on content */
+  overflow: visible;
+}
+
+

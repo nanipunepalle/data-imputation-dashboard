@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn
+python-multipart
+seaborn
+pymc_bart
+pymc
+shap
+kneed

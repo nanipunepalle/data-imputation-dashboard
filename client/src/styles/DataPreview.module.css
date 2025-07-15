@@ -1,0 +1,26 @@
+.wrapper {
+  font-size: 12px;
+  padding-top: 12px;
+  height: 100%;
+}
+
+.tableContainer {
+  height: 400px;
+  max-height: 24vh;
+  /* height: 100%; */
+  overflow: auto;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.noData {
+  padding: 16px;
+  color: #6b7280;
+}

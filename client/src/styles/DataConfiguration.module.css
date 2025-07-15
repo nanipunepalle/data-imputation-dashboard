@@ -1,0 +1,68 @@
+.container {
+    padding: 0px 8px 4px 8px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    align-items: center;
+}
+
+.uploadRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.uploadFileName {
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.dropdownGroup {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.dropdownItem {
+    flex: 1 1 250px;
+    max-width: 45%;
+    display: flex;
+    flex-direction: column;
+}
+
+.dropdownItem label {
+    margin-bottom: 0px;
+    font-size: 13px;
+    color: #595959;
+}
+
+
+.error {
+    color: red;
+    margin-top: 2px;
+    font-size: 10px;
+}
+
+.Title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.tableSection {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  margin-top: 12px;
+  min-height: 120px;
+}
