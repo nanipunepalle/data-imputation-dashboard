@@ -31,7 +31,7 @@ session_store: Dict[str, pd.DataFrame] = {}
 label_encoders: Dict[str, Dict[str, object]] = {}
 
 
-@app.post("/api/dataframe/post")
+@app.post("/dataframe/post")
 async def get_dataframe_api(file: UploadFile = File(...)):
     contents = await file.read()
     df = pd.read_csv(BytesIO(contents)).replace([np.inf, -np.inf], np.nan).fillna("")
@@ -48,7 +48,7 @@ async def get_dataframe_api(file: UploadFile = File(...)):
     }
 
 
-@app.get("/api/dataframe/describe")
+@app.get("/dataframe/describe")
 async def describe_dataframe(session_id: str = Query(...)):
     df = session_store.get(session_id)
     if df is None or df.empty:
@@ -59,7 +59,7 @@ async def describe_dataframe(session_id: str = Query(...)):
     return {"dtypes": dtypes, "statistics": stats}
 
 
-@app.post("/api/missingness_summary")
+@app.post("/missingness_summary")
 async def missingness_summary_api(file: UploadFile = File(...)):
     contents = await file.read()
     df = pd.read_csv(BytesIO(contents))
@@ -68,7 +68,7 @@ async def missingness_summary_api(file: UploadFile = File(...)):
     return {"missingness_summary": summary}
 
 
-@app.post("/api/datatype/configure")
+@app.post("/datatype/configure")
 async def configure_datatype_api(
     file: UploadFile = File(...),
     session_id: str = Form(...),
@@ -119,7 +119,7 @@ async def configure_datatype_api(
         return {"error": str(e)}
 
 
-@app.post("/api/feature_importance")
+@app.post("/feature_importance")
 async def feature_importance_api(
     session_id: str = Form(...),
     target: str = Form(...),

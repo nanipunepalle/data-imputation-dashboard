@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { Button, Upload, Select, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
@@ -46,6 +46,50 @@ const DataConfiguration: React.FC<DatasetUploadProps> = ({
     error,
     setError,
   } = useDatasetStore();
+
+
+  useEffect(() => {
+    if (!isUploaded) {
+      fetch('/sample.csv')
+        .then((res) => res.text())
+        .then((csvText) => {
+          Papa.parse(csvText, {
+            complete: (result) => {
+              const parsedData = result.data as string[][];
+
+              if (parsedData.length < 2) {
+                setError('Default CSV file is empty or invalid');
+                return;
+              }
+
+              const headers = parsedData[0];
+              const rows = parsedData.slice(1).map((row) =>
+                headers.reduce((obj, header, i) => {
+                  const value = row[i];
+                  const num = Number(value);
+                  obj[header] = isNaN(num) ? value : Math.round(num * 100) / 100;
+                  return obj;
+                }, {} as DataRow)
+              );
+
+              onDataUpload({ headers, rows });
+              setError(null);
+              setFileName('sample.csv');
+              setIsUploaded(true);
+            },
+            header: false,
+            skipEmptyLines: true,
+            error: () => {
+              setError('Error parsing default CSV');
+            },
+          });
+        })
+        .catch((err) => {
+          setError('Failed to load sample dataset');
+          console.error(err);
+        });
+    }
+  }, []);
 
 
   const handleFileChange = async (file: File) => {
