@@ -8,6 +8,9 @@ import { useDatasetStore } from '@/store/useDataStore';
 import MissingnessSummaryChart from '@/components/MissingnessSummaryChart';
 import FeatureImportanceChart from '@/components/FeatureImportanceChart';
 import { Dataset } from '@/types';
+import ImputationConfiguration from '@/components/ImputationConfiguration';
+import HistogramImputation from '@/components/ImputationDistributionHistogramChart';
+import AbsoluteDifferenceHistogram from '@/components/AbsoluteDifferenceHistogramChart';
 
 const DataFeatures: React.FC = () => {
     const {
@@ -25,7 +28,7 @@ const DataFeatures: React.FC = () => {
         setIdColumn(data.headers[1] || null);
     };
     return (
-        <Row gutter={[8, 8]} style={{ marginLeft: "4px", marginRight: "4px" }}>
+        <Row gutter={[8, 0]} style={{ marginLeft: "4px", marginRight: "4px" }}>
             <Col xs={24} lg={8} >
                 <div className={styles.columnBox}>
                     <DataConfiguration
@@ -50,12 +53,21 @@ const DataFeatures: React.FC = () => {
             </Col>
             <Col xs={24} lg={8}>
                 <div className={styles.columnBox}>
-                    {/* <FeatureImportanceSplit></FeatureImportanceSplit> */}
+                    <ImputationConfiguration></ImputationConfiguration>
                 </div>
             </Col>
-            <Col xs={24} lg={16}>
+            <Col xs={24} lg={8}>
                 <div className={styles.columnBox}>
-                    {/* <ScatterPlotD3></ScatterPlotD3> */}
+                    <div style={{
+                        height: '100%'
+                    }}>
+                        <HistogramImputation></HistogramImputation>
+                    </div>
+                </div>
+            </Col>
+            <Col xs={24} lg={8}>
+                <div className={styles.columnBox}>
+                    <AbsoluteDifferenceHistogram></AbsoluteDifferenceHistogram>
                 </div>
             </Col>
         </Row>

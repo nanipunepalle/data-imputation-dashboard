@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Dataset } from '@/types';
-import { fetchDataTypes } from '@/services/apiService';
+import { fetchDataTypes, fetchMissingnessSummary } from '@/services/apiService';
 import ChartWrapper from '@/components/ChartWrapper';
 import { Spin } from 'antd';
 
@@ -16,57 +16,50 @@ const MissingnessSummaryChart: React.FC<MissingnessChartProps> = ({ data, inModa
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dtypes, setDtypes] = useState<Record<string, string>>({});
-  const [dtypesLoaded, setDtypesLoaded] = useState(false);
+  const [missingnessData, setMissingnessData] = useState<{ feature: string; percent: number }[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!data || !data.headers.length || !svgRef.current || !containerRef.current) return;
 
-    const loadAndRender = async () => {
+    const load = async () => {
       setLoading(true);
       try {
-        const dtypesFromApi = await fetchDataTypes();
+        const [dtypesFromApi, missingData] = await Promise.all([
+          fetchDataTypes(),
+          fetchMissingnessSummary(),
+        ]);
         setDtypes(dtypesFromApi);
-        setDtypesLoaded(true);
+        setMissingnessData(missingData);
+      } catch (err) {
+        console.error('Error loading data:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    loadAndRender();
+    load();
   }, [data]);
 
   useEffect(() => {
-    if (!data || !data.headers.length || !svgRef.current || !containerRef.current || !dtypesLoaded) return;
+    if (!svgRef.current || !containerRef.current || missingnessData.length === 0) return;
 
     const containerWidth = containerRef.current.clientWidth;
-    const margin = { top: 20, right: 20, bottom: 20, left: 160 };
+    const margin = { top: 30, right: 20, bottom: 20, left: 140 };
     const width = containerWidth;
-    const barHeight = 30;
+    const barHeight = 10;
     const spacing = 10;
-
-    const missingnessData = data.headers
-      .map(header => {
-        const missingCount = data.rows.filter(row => !row[header] || row[header] === '').length;
-        const total = data.rows.length;
-        return {
-          feature: header,
-          missing: missingCount,
-          percent: (missingCount / total) * 100,
-        };
-      })
-      .sort((a, b) => b.missing - a.missing);
 
     const height = margin.top + margin.bottom + missingnessData.length * (barHeight + spacing);
 
     const x = d3.scaleLinear()
-      .domain([0, d3.max(missingnessData, d => d.missing) || 0])
+      .domain([0, d3.max(missingnessData, d => d.percent) || 0])
       .nice()
       .range([margin.left, width - margin.right]);
 
     const y = d3.scaleBand()
       .domain(missingnessData.map(d => d.feature))
-      .range([margin.top, height - margin.bottom])
+      .rangeRound([margin.top, height - margin.bottom])
       .padding(0.2);
 
     const svg = d3.select(svgRef.current);
@@ -109,7 +102,7 @@ const MissingnessSummaryChart: React.FC<MissingnessChartProps> = ({ data, inModa
       .join('rect')
       .attr('y', d => y(d.feature)!)
       .attr('x', x(0))
-      .attr('width', d => x(d.missing) - x(0))
+      .attr('width', d => x(d.percent) - x(0))
       .attr('height', y.bandwidth())
       .attr('fill', '#0072B2')
       .on('mouseover', (event, d) => {
@@ -117,8 +110,8 @@ const MissingnessSummaryChart: React.FC<MissingnessChartProps> = ({ data, inModa
         tooltip.transition().duration(200).style('opacity', 0.9);
         tooltip.html(
           `<strong>${d.feature}</strong><br/>
-          Type: <em>${dtype}</em><br/>
-          ${d.missing} missing (${d.percent.toFixed(1)}%)`
+         Type: <em>${dtype}</em><br/>
+         ${d.percent.toFixed(1)}% missing`
         );
       })
       .on('mousemove', event => {
@@ -136,10 +129,9 @@ const MissingnessSummaryChart: React.FC<MissingnessChartProps> = ({ data, inModa
       .attr('width', '100%')
       .attr('height', height);
 
-    return () => {
-      tooltip.remove();
-    };
-  }, [data, dtypesLoaded, dtypes]);
+    return () => { tooltip.remove(); };
+  }, [missingnessData, dtypes]);
+
 
   if (!data || !data.rows.length) return null;
 
@@ -155,11 +147,11 @@ const MissingnessSummaryChart: React.FC<MissingnessChartProps> = ({ data, inModa
       modalContent={<MissingnessSummaryChart data={data} inModal />}
       inModal={inModal}
     >
-      <Spin spinning={loading}>
-        <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+        <Spin spinning={loading}>
           <svg ref={svgRef} />
-        </div>
-      </Spin>
+        </Spin>
+      </div>
     </ChartWrapper>
   );
 };

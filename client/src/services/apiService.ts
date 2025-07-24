@@ -35,7 +35,7 @@ export async function configureDataType({
   }
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/api/datatype/configure`, formData, {
+    const response = await axios.post(`${API_BASE_URL}/datatype/configure`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -49,7 +49,7 @@ export async function configureDataType({
 
 export async function fetchDataTypes(): Promise<Record<string, string>> {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/dataframe/describe`, {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/describe`, {
       params: {
         session_id: getSessionId(),
       },
@@ -83,7 +83,7 @@ export async function fetchFeatureImportance(
 
   try {
     const response = await axios.post<FeatureImportanceResponse>(
-      `${API_BASE_URL}/api/feature_importance`,
+      `${API_BASE_URL}/feature_importance`,
       formData
     );
     return response.data;
@@ -98,7 +98,7 @@ export async function uploadDataset(file: File): Promise<string | null> {
   formData.append('file', file);
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/api/dataframe/post`, formData, {
+    const response = await axios.post(`${API_BASE_URL}/dataframe/post`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -109,6 +109,100 @@ export async function uploadDataset(file: File): Promise<string | null> {
     return sessionId;
   } catch (error) {
     console.error('Error uploading dataset:', error);
+    throw error;
+  }
+}
+
+export async function fetchMissingnessSummary(): Promise<{ feature: string; percent: number }[]> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/missingness_summary`, {
+      params: { session_id: getSessionId() },
+    });
+
+    const summary = response.data.missingness_summary || {};
+    return Object.entries(summary)
+      .map(([feature, percent]) => ({
+        feature,
+        percent: Number(percent),
+      }))
+      .sort((a, b) => b.percent - a.percent);
+  } catch (error) {
+    console.error('Error fetching missingness summary:', error);
+    return [];
+  }
+}
+
+export async function runImputation({
+  algo,
+  columns,
+  iterations,
+}: {
+  algo: string;
+  columns: string[];
+  iterations: number;
+}): Promise<any> {
+  const sessionId = getSessionId();
+  const formData = new FormData();
+  formData.append('session_id', sessionId);
+  formData.append('algo', algo.toLowerCase());
+  formData.append('columns', JSON.stringify(columns));
+  formData.append('iterations', iterations.toString());
+
+  const response = await axios.post(`${API_BASE_URL}/dataframe/impute`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  return response.data;
+}
+
+export async function fetchImputationMask(): Promise<{ row: number; column: string; imputed: boolean }[]> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/imputation_mask`, {
+      params: { session_id: getSessionId() },
+    });
+    return response.data.mask || [];
+  } catch (error) {
+    console.error('Error fetching imputation mask:', error);
+    return [];
+  }
+}
+
+export async function fetchColumnDistribution(column: string): Promise<{ original: number[]; imputed: number[] }> {
+  const sessionId = getSessionId();
+  const response = await axios.get(`${API_BASE_URL}/dataframe/column_distribution`, {
+    params: { session_id: sessionId, column },
+  });
+  return response.data;
+}
+
+
+export interface TestEvaluationRecord {
+  index: number;
+  column: string;
+  original: number;
+  imputed: number;
+  absolute_diff: number;
+}
+
+export interface TestEvaluationResponse {
+  test_evaluation: TestEvaluationRecord[];
+  column_list: string[];
+  summary: {
+    mean_abs_diff: number;
+    median_abs_diff: number;
+    std_abs_diff: number;
+  };
+}
+
+export async function fetchTestEvaluation(): Promise<TestEvaluationResponse> {
+  const sessionId = getSessionId();
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/test_evaluation`, {
+      params: { session_id: sessionId },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching test evaluation:', error);
     throw error;
   }
 }

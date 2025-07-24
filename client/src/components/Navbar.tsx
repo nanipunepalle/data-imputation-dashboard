@@ -5,13 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu } from 'antd';
 
-
 interface Tab {
   name: string;
   href: string;
   emoji: string;
 }
-
 
 const tabs: Tab[] = [
   { name: 'Data & Features', href: '/data-features', emoji: '📂' },
@@ -32,7 +30,11 @@ const Navbar: FC = () => {
       mode="horizontal"
       selectedKeys={[pathname]}
       items={menuItems}
-      style={{ borderBottom: '1px solid #f0f0f0' }}
+      style={{
+        borderBottom: '1px solid #f0f0f0',
+        maxHeight: '40px',
+        overflow: 'hidden'
+      }}
     />
   );
 };

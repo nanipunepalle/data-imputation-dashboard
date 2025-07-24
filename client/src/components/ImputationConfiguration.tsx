@@ -1,0 +1,168 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Radio, Select, InputNumber, Button, Progress } from 'antd';
+import ChartWrapper from '@/components/ChartWrapper';
+import styles from '@/styles/ImputationConfiguration.module.css';
+import { fetchDataTypes, fetchMissingnessSummary, runImputation } from '@/services/apiService';
+import { useDatasetStore } from '@/store/useDataStore';
+
+const { Option } = Select;
+const algorithms = ['gKNN', 'MICE', 'BART'];
+
+const algorithmDurations: Record<string, number> = {
+    gKNN: 2000,
+    MICE: 5000,
+    BART: 8000,
+};
+
+const ImputationConfiguration: React.FC = () => {
+    const { dataset, setUpdated, isUpdated } = useDatasetStore();
+    const [selectedAlgorithm, setSelectedAlgorithm] = useState('MICE');
+    const [type, setType] = useState<'Single' | 'Multiple'>('Single');
+    const [target, setTarget] = useState<string | string[] | undefined>();
+    const [maxIteration, setMaxIteration] = useState<number | null>(25);
+    const [progress, setProgress] = useState<number>(0);
+    const [loading, setLoading] = useState(false);
+    const [columns, setColumns] = useState<string[]>([]);
+
+    const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
+
+    useEffect(() => {
+
+
+        const loadColumns = async () => {
+            try {
+                fetchMissingnessSummary().then(summary => {
+                    const cols = summary.filter(s => s.percent > 0).map(s => s.feature);
+                    setColumns(cols);
+                });
+            } catch (error) {
+                console.error('Failed to fetch columns:', error);
+            }
+        };
+
+        loadColumns();
+    }, [dataset]);
+
+    const handleRunImputation = async () => {
+        if (!target || !maxIteration || !sessionId) return;
+
+        const selectedColumns = Array.isArray(target) ? target : [target];
+
+        setProgress(0);
+        setLoading(true);
+
+        const duration = algorithmDurations[selectedAlgorithm];
+        const start = Date.now();
+
+        const timer = setInterval(() => {
+            const elapsed = Date.now() - start;
+            const percent = Math.min(Math.floor((elapsed / duration) * 100), 100);
+            setProgress(percent);
+
+            if (percent >= 100) {
+                clearInterval(timer);
+            }
+        }, 200);
+
+        try {
+            const response = await runImputation({
+                algo: selectedAlgorithm,
+                columns: selectedColumns,
+                iterations: maxIteration,
+            });
+
+            console.log('Response:', response);
+            setUpdated(!isUpdated);
+        } catch (error: any) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <ChartWrapper
+            title="Imputation Configuration"
+            tooltipContent={
+                <div style={{ maxWidth: 300 }}>
+                    <p><strong>Configure the imputation algorithm</strong> by choosing the type, target, and max iterations.</p>
+                    <p>Click "Run Imputation" to begin.</p>
+                </div>
+            }
+        >
+            <div className={styles.container}>
+                <div className={styles.sidebar}>
+                    {algorithms.map((algo) => (
+                        <div
+                            key={algo}
+                            className={`${styles.algorithm} ${selectedAlgorithm === algo ? styles.selected : ''}`}
+                            onClick={() => setSelectedAlgorithm(algo)}
+                        >
+                            {algo}
+                        </div>
+                    ))}
+                </div>
+
+                <div className={styles.configPanel}>
+                    <div className={styles.formRow}>
+                        <label>Type:</label>
+                        <Radio.Group
+                            onChange={(e) => {
+                                setType(e.target.value);
+                                setTarget(undefined); // Reset selection
+                            }}
+                            value={type}
+                            className={styles.radioGroup}
+                        >
+                            <Radio value="Single">Single</Radio>
+                            <Radio value="Multiple">Multiple</Radio>
+                        </Radio.Group>
+                    </div>
+
+                    <div className={styles.formRow}>
+                        <label>Target:</label>
+                        <Select
+                            mode={type === 'Multiple' ? 'multiple' : undefined}
+                            style={{ width: '100%' }}
+                            placeholder="Select column(s)"
+                            onChange={(value) => setTarget(value)}
+                            value={target}
+                        >
+                            {columns.map((col) => (
+                                <Option key={col} value={col}>
+                                    {col}
+                                </Option>
+                            ))}
+                        </Select>
+                    </div>
+
+                    <div className={styles.formRow}>
+                        <label>Max Iteration:</label>
+                        <InputNumber
+                            min={1}
+                            style={{ width: '100%' }}
+                            value={maxIteration ?? undefined}
+                            onChange={(value) => setMaxIteration(value ?? null)}
+                        />
+                    </div>
+
+                    <div className={styles.buttonRow}>
+                        <Button type="primary" onClick={handleRunImputation} loading={loading} disabled={loading}>
+                            Run Imputation
+                        </Button>
+                    </div>
+
+                    {loading && (
+                        <div className={styles.progressBar}>
+                            <Progress percent={progress} showInfo={false} status="active" />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </ChartWrapper>
+    );
+};
+
+export default ImputationConfiguration;

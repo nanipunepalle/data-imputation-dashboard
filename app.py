@@ -1,3 +1,4 @@
+import json
 import os
 from fastapi import FastAPI, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,11 +11,15 @@ from typing import Dict
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.preprocessing import LabelEncoder
-from customLabelEncoder import CustomLabelEncoder
-from featureImportance import FeatureImportance
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import Request
+from fastapi import HTTPException
+
+from mice import MiceImputer
+from bart import BartImputer
+from customLabelEncoder import CustomLabelEncoder
+from featureImportance import FeatureImportance
 
 app = FastAPI()
 
@@ -28,13 +33,17 @@ app.add_middleware(
 
 # In-memory session stores
 session_store: Dict[str, pd.DataFrame] = {}
+
+# Store original, imputed, and combined datasets per session
+imputation_store: Dict[str, Dict[str, pd.DataFrame]] = {}
+
 label_encoders: Dict[str, Dict[str, object]] = {}
 
 
 @app.post("/dataframe/post")
 async def get_dataframe_api(file: UploadFile = File(...)):
     contents = await file.read()
-    df = pd.read_csv(BytesIO(contents)).replace([np.inf, -np.inf], np.nan).fillna("")
+    df = pd.read_csv(BytesIO(contents)).replace([np.inf, -np.inf], np.nan)
 
     session_id = uuid.uuid4().hex
     session_store[session_id] = df
@@ -42,7 +51,10 @@ async def get_dataframe_api(file: UploadFile = File(...)):
 
     return {
         "session_id": session_id,
-        "dataframe": df.head(5).to_dict(orient="records"),
+        "dataframe": df.head(5)
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna("")
+        .to_dict(orient="records"),
         "columns": df.columns.tolist(),
         "shape": df.shape,
     }
@@ -59,10 +71,14 @@ async def describe_dataframe(session_id: str = Query(...)):
     return {"dtypes": dtypes, "statistics": stats}
 
 
-@app.post("/missingness_summary")
-async def missingness_summary_api(file: UploadFile = File(...)):
-    contents = await file.read()
-    df = pd.read_csv(BytesIO(contents))
+@app.get("/dataframe/missingness_summary")
+async def missingness_summary_api(session_id: str = Query(...)):
+    df = session_store.get(session_id)
+    if df is None or df.empty:
+        raise HTTPException(
+            status_code=404, detail="No dataset found for this session."
+        )
+
     missing_percent = (df.isnull().mean() * 100).round(2)
     summary = missing_percent.to_dict()
     return {"missingness_summary": summary}
@@ -87,11 +103,15 @@ async def configure_datatype_api(
         if dtype == "Categorical":
             le = (
                 CustomLabelEncoder(treat_none_as_category=treat_none_as_category)
-                if custom_encoder else LabelEncoder()
+                if custom_encoder
+                else LabelEncoder()
             )
 
             if not custom_encoder:
-                df[column].fillna("SPECIFICALLY_MARKED_MISSING_CATEGORY_PREPROCESSING_DATA", inplace=True)
+                df[column].fillna(
+                    "SPECIFICALLY_MARKED_MISSING_CATEGORY_PREPROCESSING_DATA",
+                    inplace=True,
+                )
 
             df[column] = df[column].astype(str)
 
@@ -99,8 +119,13 @@ async def configure_datatype_api(
                 df[column] = le.fit_transform(df, column)
             else:
                 df[column] = le.fit_transform(df[column])
-                if "SPECIFICALLY_MARKED_MISSING_CATEGORY_PREPROCESSING_DATA" in le.classes_:
-                    missing_val = le.transform(["SPECIFICALLY_MARKED_MISSING_CATEGORY_PREPROCESSING_DATA"])[0]
+                if (
+                    "SPECIFICALLY_MARKED_MISSING_CATEGORY_PREPROCESSING_DATA"
+                    in le.classes_
+                ):
+                    missing_val = le.transform(
+                        ["SPECIFICALLY_MARKED_MISSING_CATEGORY_PREPROCESSING_DATA"]
+                    )[0]
                     df[column].replace(missing_val, np.nan, inplace=True)
 
             label_encoders[session_id][column] = le
@@ -140,15 +165,17 @@ async def feature_importance_api(
     rf_shap_scores = featureImportance.featureRF_SHAP()
     lasso_shap_scores = featureImportance.featureLasso_SHAP()
 
-    importance_df = pd.DataFrame({
-        "Pearson": pearson_scores,
-        "Spearman": spearman_scores,
-        "MutualInfo": mutual_scores,
-        "RF": rf_scores,
-        "Lasso": lasso_scores,
-        "RF_SHAP": rf_shap_scores,
-        "Lasso_SHAP": lasso_shap_scores,
-    })
+    importance_df = pd.DataFrame(
+        {
+            "Pearson": pearson_scores,
+            "Spearman": spearman_scores,
+            "MutualInfo": mutual_scores,
+            "RF": rf_scores,
+            "Lasso": lasso_scores,
+            "RF_SHAP": rf_shap_scores,
+            "Lasso_SHAP": lasso_shap_scores,
+        }
+    )
 
     res_cols = []
     match method:
@@ -167,16 +194,29 @@ async def feature_importance_api(
         case "lasso_shap":
             res_cols.append("Lasso_SHAP")
         case "all_methods":
-            res_cols = ["Pearson", "Spearman", "MutualInfo", "RF", "Lasso", "RF_SHAP", "Lasso_SHAP"]
+            res_cols = [
+                "Pearson",
+                "Spearman",
+                "MutualInfo",
+                "RF",
+                "Lasso",
+                "RF_SHAP",
+                "Lasso_SHAP",
+            ]
 
-    magnitude_df = importance_df[res_cols].apply(lambda s: (s - s.min()) / (s.max() - s.min()) if s.max() != s.min() else s, axis=0)
+    magnitude_df = importance_df[res_cols].apply(
+        lambda s: (s - s.min()) / (s.max() - s.min()) if s.max() != s.min() else s,
+        axis=0,
+    )
     importance_df["Combined"] = magnitude_df.mean(axis=1)
 
     directional_columns = ["Pearson", "Spearman", "Lasso"]
     importance_df["Direction"] = importance_df[directional_columns].mean(axis=1)
     importance_df["Direction_Sign"] = importance_df["Direction"].apply(np.sign)
 
-    combined_sorted = importance_df[["Combined", "Direction_Sign"]].sort_values(by="Combined", ascending=False)
+    combined_sorted = importance_df[["Combined", "Direction_Sign"]].sort_values(
+        by="Combined", ascending=False
+    )
     combined_sorted["Combined"] = combined_sorted["Combined"].clip(0, 1)
 
     if threshold is not None:
@@ -190,6 +230,121 @@ async def feature_importance_api(
     return {
         "Combined_df": combined_sorted.to_dict(orient="index"),
         "knee_features": knee_features,
+    }
+
+
+@app.post("/dataframe/impute")
+async def impute_api(
+    session_id: str = Form(...),
+    algo: str = Form(...),
+    columns: str = Form(...),
+    iterations: int = Form(...),
+):
+    df = session_store.get(session_id)
+    if df is None or df.empty:
+        raise HTTPException(
+            status_code=404, detail="No dataset found for this session."
+        )
+
+    try:
+        columns = json.loads(columns)  # parse JSON array
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=400, detail="Invalid columns format. Expected a JSON list."
+        )
+
+    if algo == "mice":
+        imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
+    elif algo == "bart":
+        imputer = BartImputer(df.copy(), columns, max_iter=iterations)
+    elif algo == "gKNN":
+        raise HTTPException(
+            status_code=400, detail="gKNN imputation not implemented yet."
+        )
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
+
+    # Run imputation
+    orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask = (
+        imputer.impute()
+    )
+
+    # Save imputed components separately for this session
+    imputation_store[session_id] = {
+        "original": orig_vals,
+        "imputed": imp_vals,
+        "combined": combined,
+        "mask": mask,
+        "test_orig": test_orig,
+        "test_imp": test_imp,
+        "test_mask": test_mask,
+    }
+
+    return {
+        "orig_values": orig_vals.head(5).to_dict(orient="records"),
+        "imputed_values": imp_vals.head(5).to_dict(orient="records"),
+        "combined": combined.head(5).to_dict(orient="records"),
+        "columns": combined.columns.tolist(),
+        "shape": combined.shape,
+    }
+
+
+@app.get("/dataframe/column_distribution")
+def get_column_distribution(session_id: str = Query(...), column: str = Query(...)):
+    if session_id not in imputation_store:
+        raise HTTPException(
+            status_code=404, detail="No imputation data for this session."
+        )
+
+    original_df = imputation_store[session_id]["original"]
+    combined_df = imputation_store[session_id]["combined"]
+    imputed_df = imputation_store[session_id]["imputed"]
+
+    if column not in combined_df.columns:
+        raise HTTPException(status_code=400, detail="Invalid column.")
+
+    orig_vals = original_df[column].dropna().tolist()
+    imputed_vals = imputed_df[column].dropna().tolist()
+
+    return {
+        "original": orig_vals,
+        "imputed": imputed_vals,
+    }
+
+@app.get("/dataframe/test_evaluation")
+def get_test_evaluation(session_id: str = Query(...)):
+    """
+    Returns the 20% masked test original and imputed values for evaluation.
+    """
+    if session_id not in imputation_store:
+        raise HTTPException(
+            status_code=404, detail="No imputation data for this session."
+        )
+
+    test_orig = imputation_store[session_id].get("test_orig")
+    test_imp = imputation_store[session_id].get("test_imp")
+
+    if test_orig is None or test_imp is None:
+        raise HTTPException(status_code=404, detail="Test evaluation data not found.")
+
+    # Flatten to return only aligned, non-null pairs
+    test_orig_flat = test_orig.stack().reset_index()
+    test_imp_flat = test_imp.stack().reset_index()
+
+    test_orig_flat.columns = ["index", "column", "original"]
+    test_imp_flat.columns = ["index", "column", "imputed"]
+
+    merged = pd.merge(test_orig_flat, test_imp_flat, on=["index", "column"])
+    merged["absolute_diff"] = (merged["original"] - merged["imputed"]).abs()
+
+    return {
+        "test_evaluation": merged.to_dict(orient="records"),
+        "column_list": merged["column"].unique().tolist(),
+        "summary": {
+            "mean_abs_diff": merged["absolute_diff"].mean(),
+            "median_abs_diff": merged["absolute_diff"].median(),
+            "std_abs_diff": merged["absolute_diff"].std(),
+        }
     }
 
 

@@ -10,6 +10,7 @@ interface DatasetState {
   uploadedFile: File | null;
   isUploaded: boolean;
   error: string | null;
+  isUpdated: boolean
 
   setDataset: (data: Dataset) => void;
   setTargetColumn: (column: string | null) => void;
@@ -18,6 +19,7 @@ interface DatasetState {
   setUploadedFile: (file: File | null) => void;
   setIsUploaded: (flag: boolean) => void;
   setError: (err: string | null) => void;
+  setUpdated: (flag: boolean) => void
 }
 
 export const useDatasetStore = create<DatasetState>((set) => ({
@@ -28,6 +30,7 @@ export const useDatasetStore = create<DatasetState>((set) => ({
   uploadedFile: null,
   isUploaded: false,
   error: null,
+  isUpdated: false,
 
   setDataset: (dataset) => set({ dataset }),
   setTargetColumn: (targetColumn) => set({ targetColumn }),
@@ -36,4 +39,5 @@ export const useDatasetStore = create<DatasetState>((set) => ({
   setUploadedFile: (uploadedFile) => set({ uploadedFile }),
   setIsUploaded: (isUploaded) => set({ isUploaded }),
   setError: (error) => set({ error }),
+  setUpdated: (isUpdated) => set({ isUpdated })
 }));

@@ -95,3 +95,13 @@
   position: relative;
   padding-top: 2px;
 }
+
+.chartFixedArea {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex: 1;
+  height: 100%;
+  flex-direction: column;
+  box-sizing: border-box;
+}

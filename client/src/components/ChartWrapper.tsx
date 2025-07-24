@@ -13,6 +13,7 @@ interface ChartWrapperProps {
     modalContent?: React.ReactNode;
     inModal?: boolean;
     controls?: React.ReactNode;
+    fixed?: boolean
 }
 
 const ChartWrapper: React.FC<ChartWrapperProps> = ({
@@ -22,7 +23,8 @@ const ChartWrapper: React.FC<ChartWrapperProps> = ({
     legend,
     modalContent,
     inModal = false,
-    controls
+    controls,
+    fixed = false
 }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -48,7 +50,7 @@ const ChartWrapper: React.FC<ChartWrapperProps> = ({
 
             {legend && <div className={styles.legend}>{legend}</div>}
 
-            <div className={styles.chartScrollArea}>{children}</div>
+            <div className={fixed ? styles.chartFixedArea: styles.chartScrollArea}>{children}</div>
 
             <Modal
                 open={isModalVisible}

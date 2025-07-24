@@ -58,8 +58,8 @@ const FeatureImportanceChart: React.FC<{ inModal?: boolean }> = ({ inModal }) =>
     svg.selectAll('*').remove();
 
     const containerWidth = containerRef.current.clientWidth;
-    const margin = { top: 20, right: 20, bottom: 20, left: 160 };
-    const barHeight = 30;
+    const margin = { top: 30, right: 20, bottom: 10, left: 140 };
+    const barHeight = 10;
     const spacing = 10;
     const chartHeight = features.length * (barHeight + spacing);
     const height = margin.top + margin.bottom + chartHeight;
@@ -73,7 +73,7 @@ const FeatureImportanceChart: React.FC<{ inModal?: boolean }> = ({ inModal }) =>
 
     const y = d3.scaleBand()
       .domain(features.map(d => d.name))
-      .range([margin.top, height - margin.bottom])
+      .rangeRound([margin.top, height - margin.bottom])
       .padding(0.2);
 
     const tooltip = d3.select(containerRef.current)
@@ -128,6 +128,8 @@ const FeatureImportanceChart: React.FC<{ inModal?: boolean }> = ({ inModal }) =>
       .attr('preserveAspectRatio', 'xMinYMin meet')
       .attr('width', '100%')
       .attr('height', height);
+
+    return () => { tooltip.remove(); };
   }, [features]);
 
   if (!dataset || !targetColumn) return null;
@@ -157,11 +159,11 @@ const FeatureImportanceChart: React.FC<{ inModal?: boolean }> = ({ inModal }) =>
       modalContent={<FeatureImportanceChart inModal />}
       inModal={inModal}
     >
-      <Spin spinning={loading}>
-        <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+        <Spin spinning={loading}>
           <svg ref={svgRef} />
-        </div>
-      </Spin>
+        </Spin>
+      </div>
     </ChartWrapper>
   );
 };
