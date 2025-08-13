@@ -9,3 +9,12 @@ pymc_bart
 pymc
 shap
 kneed
+shap
+matplotlib
+optuna
+kneed
+xgboost
+seaborn
+statsmodels
+pingouin
+openpyxl

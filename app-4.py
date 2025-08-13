@@ -372,7 +372,6 @@ def get_test_evaluation(session_id: str = Query(...)):
         }
     }
 
-
 @app.get("/dataframe/scatter_plot_data")
 def get_scatter_plot_data(
     session_id: str = Query(...),
@@ -385,12 +384,7 @@ def get_scatter_plot_data(
     imputed_df = imputation_store[session_id]["imputed"]
     mask_df = imputation_store[session_id].get("mask")
 
-    original_df = session_store.get(session_id)
-
-    print(imputed_df.shape)
-    print(original_df.shape)
-    print(mask_df.shape)
-    # original_df = imputation_store[session_id]["combined"]
+    original_df = session_store.get(session_id+'raw')
     if original_df is None or x_column not in original_df.columns:
         raise HTTPException(status_code=400, detail="X column not found in original dataset.")
 
@@ -398,21 +392,14 @@ def get_scatter_plot_data(
         raise HTTPException(status_code=400, detail="Invalid y column.")
 
     points = []
-    # print(imputed_df)
-    # print(mask_df)
-    # print(len(imputed_df))
-    # print(len(original_df))
-    for idx in original_df.index:
+    print(imputed_df)
+    print(mask_df)
+    for idx in imputed_df.index:
         x_val = original_df.at[idx, x_column] if idx in original_df.index else None
-        if idx in original_df.index and original_df.at[idx, y_column]:
-            y_val = original_df.at[idx, y_column]
-        else:
-            y_val = imputed_df.at[idx, y_column] if idx in imputed_df.index else None
-
-        # print(x_val, y_val)
+        y_val = imputed_df.at[idx, y_column] if idx in imputed_df.index else None
 
         if pd.isna(x_val) or pd.isna(y_val):
-            # print("temp")
+            print("temp")
             continue  # Skip missing
 
         is_imputed = (
@@ -421,9 +408,7 @@ def get_scatter_plot_data(
             and pd.notna(mask_df.at[idx, y_column])
             and mask_df.at[idx, y_column]
         )
-        # if is_imputed:
-        #     print("imputed", mask_df.at[idx, y_column], y_column, idx)
-        # print("y_val", y_val)
+
         points.append({
             "x": float(x_val),
             "y": float(y_val),

@@ -79,7 +79,7 @@ class MiceImputer:
         # Extract original and imputed values for:
         orig_values = original_series.dropna()
         imputed_values_only = self.df.loc[combined_mask.any(axis=1), self.cols]
-        combined = self.df[self.cols].copy()
+        combined = self.df.copy()
 
         # Extract only 20% evaluation mask values separately
         original_values_20 = original_series[evaluation_mask]

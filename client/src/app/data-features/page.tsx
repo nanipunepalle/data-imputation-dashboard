@@ -11,6 +11,7 @@ import { Dataset } from '@/types';
 import ImputationConfiguration from '@/components/ImputationConfiguration';
 import HistogramImputation from '@/components/ImputationDistributionHistogramChart';
 import AbsoluteDifferenceHistogram from '@/components/AbsoluteDifferenceHistogramChart';
+import ImputedScatterPlot from '@/components/ImputedScatterChart';
 
 const DataFeatures: React.FC = () => {
     const {
@@ -61,7 +62,8 @@ const DataFeatures: React.FC = () => {
                     <div style={{
                         height: '100%'
                     }}>
-                        <HistogramImputation></HistogramImputation>
+                        {/* <HistogramImputation></HistogramImputation> */}
+                        <ImputedScatterPlot></ImputedScatterPlot>
                     </div>
                 </div>
             </Col>

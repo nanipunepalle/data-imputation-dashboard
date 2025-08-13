@@ -66,7 +66,6 @@ async def get_dataframe_api(file: UploadFile = File(...)):
     contents = await file.read()
     df = pd.read_csv(BytesIO(contents)).replace([np.inf, -np.inf], np.nan)
     merged_df = get_merged_df(df)
-    # merged_df = df
 
     session_id = uuid.uuid4().hex
     session_store[session_id] = merged_df
@@ -279,7 +278,7 @@ async def impute_api(
             status_code=400, detail="Invalid columns format. Expected a JSON list."
         )
     
-    print(f"Imputing with algo={algo}, columns={columns}, iterations={iterations}")
+    print(f"Aitik: Imputing with algo={algo}, columns={columns}, iterations={iterations}")
     if algo == "mice":
         imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
     elif algo == "bart":
@@ -371,71 +370,6 @@ def get_test_evaluation(session_id: str = Query(...)):
             "std_abs_diff": merged["absolute_diff"].std(),
         }
     }
-
-
-@app.get("/dataframe/scatter_plot_data")
-def get_scatter_plot_data(
-    session_id: str = Query(...),
-    x_column: str = Query(...),
-    y_column: str = Query(...)
-):
-    if session_id not in imputation_store:
-        raise HTTPException(status_code=400, detail="No imputation data for this session.")
-
-    imputed_df = imputation_store[session_id]["imputed"]
-    mask_df = imputation_store[session_id].get("mask")
-
-    original_df = session_store.get(session_id)
-
-    print(imputed_df.shape)
-    print(original_df.shape)
-    print(mask_df.shape)
-    # original_df = imputation_store[session_id]["combined"]
-    if original_df is None or x_column not in original_df.columns:
-        raise HTTPException(status_code=400, detail="X column not found in original dataset.")
-
-    if y_column not in imputed_df.columns:
-        raise HTTPException(status_code=400, detail="Invalid y column.")
-
-    points = []
-    # print(imputed_df)
-    # print(mask_df)
-    # print(len(imputed_df))
-    # print(len(original_df))
-    for idx in original_df.index:
-        x_val = original_df.at[idx, x_column] if idx in original_df.index else None
-        if idx in original_df.index and original_df.at[idx, y_column]:
-            y_val = original_df.at[idx, y_column]
-        else:
-            y_val = imputed_df.at[idx, y_column] if idx in imputed_df.index else None
-
-        # print(x_val, y_val)
-
-        if pd.isna(x_val) or pd.isna(y_val):
-            # print("temp")
-            continue  # Skip missing
-
-        is_imputed = (
-            mask_df is not None
-            and y_column in mask_df.columns
-            and pd.notna(mask_df.at[idx, y_column])
-            and mask_df.at[idx, y_column]
-        )
-        # if is_imputed:
-        #     print("imputed", mask_df.at[idx, y_column], y_column, idx)
-        # print("y_val", y_val)
-        points.append({
-            "x": float(x_val),
-            "y": float(y_val),
-            "label": "Imputed" if is_imputed else "Rest"
-        })
-
-    return {
-        "x_column": x_column,
-        "y_column": y_column,
-        "points": points
-    }
-
 
 
 if __name__ == "__main__":

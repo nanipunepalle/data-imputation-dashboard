@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export const API_BASE_URL = 'https://data-imputation-dashboard.eastus.cloudapp.azure.com';
+export const API_BASE_URL = 'http://localhost:8000';
 
 // Utility to get session_id from localStorage
 function getSessionId(): string {
@@ -206,3 +206,11 @@ export async function fetchTestEvaluation(): Promise<TestEvaluationResponse> {
     throw error;
   }
 }
+
+export const fetchScatterPlotData = async (xColumn: string, yColumn: string) => {
+    const sessionId = localStorage.getItem("session_id"); // or wherever it's stored
+    const res = await fetch(`${API_BASE_URL}/dataframe/scatter_plot_data?session_id=${sessionId}&x_column=${xColumn}&y_column=${yColumn}`);
+    if (!res.ok) throw new Error("Failed to fetch scatter plot data");
+    return await res.json();
+};
+
