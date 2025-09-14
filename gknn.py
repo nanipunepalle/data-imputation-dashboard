@@ -39,7 +39,8 @@ class gKNNImputer:
         missing = missing[~missing['County Code'].isna()]
 
         cdc_geoids = set(cdc_df['County Code'].unique())
-        new_missing = missing[~missing['County Code'].isin(cdc_geoids)].copy()
+        # new_missing = missing[~missing['County Code'].isin(cdc_geoids)].copy()
+        new_missing = missing.copy()
         
         for col in cdc_df.columns:
             if col not in new_missing.columns:
@@ -50,6 +51,18 @@ class gKNNImputer:
         
         # Concatenate the CDC data (priority rows) with the new missing rows.
         merged_df = pd.concat([cdc_df, new_missing], ignore_index=True)
+        # Remove common columns except 'County Code' from new_missing before merging
+        common_cols = [col for col in cdc_df.columns if col in new_missing.columns and col != 'County Code']
+        cdc_df_drop = cdc_df.drop(columns=common_cols)
+        merged_df1 = pd.merge(cdc_df_drop, new_missing, on='County Code', how='right')
+        
+        # Remove duplicate County Code rows where Deaths_Per_100k is empty
+        duplicates = merged_df[merged_df.duplicated(subset=['County Code'], keep=False)]
+        to_drop = duplicates[duplicates['Deaths_per_100k'].isna()].index
+        merged_df = merged_df.drop(index=to_drop).reset_index(drop=True)
+
+        print(f"Merged CDC data shape after adding missing: {merged_df.shape}")
+
         
         return merged_df
 
@@ -96,7 +109,6 @@ class gKNNImputer:
     def getMissingData(self, year):
         file_path = self.getMissingDataFile()
         # file_path = f"../../CDC time series/Population/Population_2000_2022.csv"
-        # print(file_path)
         df_year = pd.read_csv(file_path)
 
         year_col = str(year)
@@ -113,8 +125,10 @@ class gKNNImputer:
         # Fit the imputer on the data
         target = self.columns[0]
 
-        twenty_imp, twenty_true, twenty_mask = self.run(self.df, target, ['random'], validation=True, real_test=True)
-        orig_values, imp_values, combined, mask = self.run(self.df, target, validation=True, real_test=False)
+        twenty_imp, twenty_true, twenty_mask = self.run(self.df, target, ['random'], validation=False, real_test=True)
+        orig_values, imp_values, combined, mask = self.run(self.df, target, validation=False, real_test=False)
+        if isinstance(combined, pd.DataFrame) and 'County Code' in combined.columns:
+            combined = combined.sort_values('County Code').reset_index(drop=True)
         return orig_values, imp_values, combined, mask, twenty_true, twenty_imp, twenty_mask
 
     def run(self, df, target, death_threshold=[], interval=False, validation=False,real_test=False, plot=False):
@@ -197,25 +211,27 @@ class gKNNImputer:
             metrics["Benchmark"] = benchmark_results
             
             # Create boolean mask for test data
-            test_mask_bool = pd.DataFrame(index=test_data.index, columns=[target])
+            test_mask_bool = pd.DataFrame(index=test_data.index, columns=[target, "County Code"])
             test_mask_bool[target] = True  # True indicates this value was masked/imputed
-            
+            test_mask_bool["County Code"] = test_data["County Code"]
             return twenty_imp.to_frame(), twenty_true.to_frame(), test_mask_bool
         
         # Write the imputation for final_cdc_data (which contains rows with missing target)
         all_neighbor_map, imputed_values_dict , combined, imp_values, orig_values, mask_all= writeImputation(final_cdc_data, df_socio_econ, D_combined, k=best_k)
 
-        if validation:
-            final_metrics = validate_imputation_kfold(training_data, D_combined, target, k=best_k, plot=plot)
-            print("\nFinal Imputation Performance Metrics:")
-            print(final_metrics)
+        # if validation:
+        #     final_metrics = validate_imputation_kfold(training_data, D_combined, target, k=best_k, plot=plot)
+        #     print("\nFinal Imputation Performance Metrics:")
+        #     print(final_metrics)
 
         # Create boolean mask for missing values
-        mask_bool = pd.DataFrame(index=final_cdc_data.index, columns=[target])
+        mask_bool = pd.DataFrame(index=final_cdc_data.index, columns=[target, "County Code"])
+        mask_bool["County Code"] = final_cdc_data["County Code"]
         mask_bool[target] = False  # Initialize all as False
         # Set True for indices that were missing and got imputed
         missing_indices = mask_all.index if hasattr(mask_all, 'index') else mask_all[0] if isinstance(mask_all, pd.DataFrame) else []
         if len(missing_indices) > 0:
             mask_bool.loc[missing_indices, target] = True
 
+        mask_bool = mask_bool.sort_values(by="County Code").reset_index(drop=True)
         return orig_values.to_frame(), imp_values.to_frame(), combined.to_frame(), mask_bool
