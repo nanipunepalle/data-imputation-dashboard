@@ -56,6 +56,15 @@ class MiceImputer:
         evaluation_mask = pd.DataFrame(False, index=self.df.index, columns=self.cols)
         np.random.seed(self.random_state)
 
+        # Create combined mask for specified columns (e.g., 'deaths_per_100k' and 'county code')
+        combined_mask = self.df[['Deaths_per_100k', 'County Code']]
+        # Traverse combined_mask on column Deaths_per_100k
+        for idx, value in combined_mask['Deaths_per_100k'].items():
+            if pd.notna(value):
+                combined_mask.at[idx, 'Deaths_per_100k'] = False
+            else:
+                combined_mask.at[idx, 'Deaths_per_100k'] = True
+
         for col in self.cols:
             non_null_indices = self.df[self.df[col].notna()].index
             sample_size = int(0.2 * len(non_null_indices))
@@ -63,10 +72,6 @@ class MiceImputer:
             evaluation_mask.loc[sample_indices, col] = True
             self.df.loc[sample_indices, col] = np.nan  # Mask for evaluation
 
-        # Full mask: original missing + evaluation missing
-        combined_mask = original_series.isna() | evaluation_mask
-
-        print("Mask used for imputation:", combined_mask)
 
         # Impute using IterativeImputer
         imputer = IterativeImputer(max_iter=self.max_iter, random_state=self.random_state)
@@ -78,8 +83,8 @@ class MiceImputer:
 
         # Extract original and imputed values for:
         orig_values = original_series.dropna()
-        imputed_values_only = self.df.loc[combined_mask.any(axis=1), self.cols]
-        combined = self.df.copy()
+        imputed_values_only = self.df.loc[combined_mask['Deaths_per_100k'], self.cols]
+        combined = self.df[self.cols].copy()
 
         # Extract only 20% evaluation mask values separately
         original_values_20 = original_series[evaluation_mask]

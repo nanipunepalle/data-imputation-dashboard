@@ -17,7 +17,7 @@ from fastapi import Request
 from fastapi import HTTPException
 
 from mice import MiceImputer
-from bart import BartImputer
+# from bart import BartImputer
 from gknn import gKNNImputer
 from customLabelEncoder import CustomLabelEncoder
 from featureImportance import FeatureImportance
@@ -52,13 +52,29 @@ def get_merged_df(df):
     print("First CSV file shape:", df1.shape)
     print("Second CSV file shape:", df2.shape)
 
-    merged_df = pd.merge(df1, df2, left_on='County Code', right_on='GEOID', how='outer')
+    df1['County Code'] = df1['County Code'].astype(str).str.replace('\.0$', '', regex=True)
+    df2['GEOID'] = df2['GEOID'].astype(str)
+
+    # Merge the dataframes using a right join
+    merged_df = pd.merge(df1, df2, left_on='County Code', right_on='GEOID', how='right')
+
+    # Replace 'GEOID' column with 'County Code' (assuming 'County Code' is preferred)
+    merged_df['County Code'] = merged_df['GEOID']
+    merged_df = merged_df.drop('GEOID', axis=1)
+    # Convert 'County Code' to integer, handling errors if any
+    merged_df['County Code'] = pd.to_numeric(merged_df['County Code'], errors='coerce').astype('Int64')
+
+    merged_df.to_csv('merged_debug.csv', index=False)
     print("Merged DataFrame shape:", merged_df.shape)
+    
+    # Reset index to avoid length mismatch errors
+    merged_df = merged_df.reset_index(drop=True)
+    
     merged_df = merged_df.select_dtypes(include=['number'])
 
     print("Merged DataFrame with numeric types only shape:", merged_df.shape)
 
-    merged_df = merged_df.drop(columns=['County Code','Deaths','Population','Unnamed: 3'], errors='ignore')
+    merged_df = merged_df.drop(columns=['Deaths','Population','Unnamed: 3'], errors='ignore')
     return merged_df
 
 @app.post("/dataframe/post")
@@ -176,86 +192,87 @@ async def feature_importance_api(
     threshold: float = Form(None),
     top_n: int = Form(None),
 ):
-    df = session_store.get(session_id)
-    target = 'Deaths_per_100k'
-    if df is None or df.empty:
-        return {"error": "No dataset found for this session."}
+    # df = session_store.get(session_id)
+    # target = 'Deaths_per_100k'
+    # if df is None or df.empty:
+    #     return {"error": "No dataset found for this session."}
 
-    featureImportance = FeatureImportance(df, target)
-    pearson_scores = featureImportance.featureCorr("pearson")
-    spearman_scores = featureImportance.featureCorr("spearman")
-    mutual_scores = featureImportance.featureMutualInfo()
-    rf_scores = featureImportance.featureRF()
-    lasso_scores = featureImportance.featureLasso().abs()
-    rf_shap_scores = featureImportance.featureRF_SHAP()
-    lasso_shap_scores = featureImportance.featureLasso_SHAP()
+    # featureImportance = FeatureImportance(df, target)
+    # pearson_scores = featureImportance.featureCorr("pearson")
+    # spearman_scores = featureImportance.featureCorr("spearman")
+    # mutual_scores = featureImportance.featureMutualInfo()
+    # rf_scores = featureImportance.featureRF()
+    # lasso_scores = featureImportance.featureLasso().abs()
+    # rf_shap_scores = featureImportance.featureRF_SHAP()
+    # lasso_shap_scores = featureImportance.featureLasso_SHAP()
 
-    importance_df = pd.DataFrame(
-        {
-            "Pearson": pearson_scores,
-            "Spearman": spearman_scores,
-            "MutualInfo": mutual_scores,
-            "RF": rf_scores,
-            "Lasso": lasso_scores,
-            "RF_SHAP": rf_shap_scores,
-            "Lasso_SHAP": lasso_shap_scores,
-        }
-    )
+    # importance_df = pd.DataFrame(
+    #     {
+    #         "Pearson": pearson_scores,
+    #         "Spearman": spearman_scores,
+    #         "MutualInfo": mutual_scores,
+    #         "RF": rf_scores,
+    #         "Lasso": lasso_scores,
+    #         "RF_SHAP": rf_shap_scores,
+    #         "Lasso_SHAP": lasso_shap_scores,
+    #     }
+    # )
 
-    res_cols = []
-    match method:
-        case "pearson":
-            res_cols.append("Pearson")
-        case "spearman":
-            res_cols.append("Spearman")
-        case "mutual_info":
-            res_cols.append("MutualInfo")
-        case "rf":
-            res_cols.append("RF")
-        case "lasso":
-            res_cols.append("Lasso")
-        case "rf_shap":
-            res_cols.append("RF_SHAP")
-        case "lasso_shap":
-            res_cols.append("Lasso_SHAP")
-        case "all_methods":
-            res_cols = [
-                "Pearson",
-                "Spearman",
-                "MutualInfo",
-                "RF",
-                "Lasso",
-                "RF_SHAP",
-                "Lasso_SHAP",
-            ]
+    # res_cols = []
+    # match method:
+    #     case "pearson":
+    #         res_cols.append("Pearson")
+    #     case "spearman":
+    #         res_cols.append("Spearman")
+    #     case "mutual_info":
+    #         res_cols.append("MutualInfo")
+    #     case "rf":
+    #         res_cols.append("RF")
+    #     case "lasso":
+    #         res_cols.append("Lasso")
+    #     case "rf_shap":
+    #         res_cols.append("RF_SHAP")
+    #     case "lasso_shap":
+    #         res_cols.append("Lasso_SHAP")
+    #     case "all_methods":
+    #         res_cols = [
+    #             "Pearson",
+    #             "Spearman",
+    #             "MutualInfo",
+    #             "RF",
+    #             "Lasso",
+    #             "RF_SHAP",
+    #             "Lasso_SHAP",
+    #         ]
 
-    magnitude_df = importance_df[res_cols].apply(
-        lambda s: (s - s.min()) / (s.max() - s.min()) if s.max() != s.min() else s,
-        axis=0,
-    )
-    importance_df["Combined"] = magnitude_df.mean(axis=1)
+    # magnitude_df = importance_df[res_cols].apply(
+    #     lambda s: (s - s.min()) / (s.max() - s.min()) if s.max() != s.min() else s,
+    #     axis=0,
+    # )
+    # importance_df["Combined"] = magnitude_df.mean(axis=1)
 
-    directional_columns = ["Pearson", "Spearman", "Lasso"]
-    importance_df["Direction"] = importance_df[directional_columns].mean(axis=1)
-    importance_df["Direction_Sign"] = importance_df["Direction"].apply(np.sign)
+    # directional_columns = ["Pearson", "Spearman", "Lasso"]
+    # importance_df["Direction"] = importance_df[directional_columns].mean(axis=1)
+    # importance_df["Direction_Sign"] = importance_df["Direction"].apply(np.sign)
 
-    combined_sorted = importance_df[["Combined", "Direction_Sign"]].sort_values(
-        by="Combined", ascending=False
-    )
-    combined_sorted["Combined"] = combined_sorted["Combined"].clip(0, 1)
+    # combined_sorted = importance_df[["Combined", "Direction_Sign"]].sort_values(
+    #     by="Combined", ascending=False
+    # )
+    # combined_sorted["Combined"] = combined_sorted["Combined"].clip(0, 1)
 
-    if threshold is not None:
-        combined_sorted = combined_sorted[combined_sorted["Combined"] >= threshold]
-    if top_n is not None:
-        combined_sorted = combined_sorted.head(top_n)
+    # if threshold is not None:
+    #     combined_sorted = combined_sorted[combined_sorted["Combined"] >= threshold]
+    # if top_n is not None:
+    #     combined_sorted = combined_sorted.head(top_n)
 
-    knee_features = featureImportance.impFeatureKnee(combined_sorted, min_combined=0.3)
-    combined_sorted = combined_sorted.replace([np.inf, -np.inf], np.nan).dropna()
+    # knee_features = featureImportance.impFeatureKnee(combined_sorted, min_combined=0.3)
+    # combined_sorted = combined_sorted.replace([np.inf, -np.inf], np.nan).dropna()
 
-    return {
-        "Combined_df": combined_sorted.to_dict(orient="index"),
-        "knee_features": knee_features,
-    }
+    # return {
+    #     "Combined_df": combined_sorted.to_dict(orient="index"),
+    #     "knee_features": knee_features,
+    # }
+    pass
 
 
 @app.post("/dataframe/impute")
@@ -280,19 +297,48 @@ async def impute_api(
         )
     
     print(f"Imputing with algo={algo}, columns={columns}, iterations={iterations}")
-    if algo == "mice":
-        imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
-    elif algo == "bart":
-        imputer = BartImputer(df.copy(), columns, max_iter=iterations)
-    elif algo == "gknn":
-        imputer = gKNNImputer(raw_df.copy(), columns)
+    # Check cache for repeated calls
+    cache_key = f"{session_id}_{algo}_{json.dumps(columns)}_{iterations}"
+    if cache_key in imputation_store:
+        cached = imputation_store[cache_key]
+        orig_vals = cached["original"]
+        imp_vals = cached["imputed"]
+        print("Aitik: Using cached imputation result")
+        imp_vals.to_csv(f"{algo}_imputed.csv", index=False)
+        combined = cached["combined"]
+        mask = cached["mask"]
+        test_orig = cached["test_orig"]
+        test_imp = cached["test_imp"]
+        test_mask = cached["test_mask"]
     else:
-        raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
+        if algo == "mice":
+            imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
+        elif algo == "bart":
+            # imputer = BartImputer(df.copy(), columns, max_iter=iterations)
+            pass
+        elif algo == "gknn":
+            imputer = gKNNImputer(raw_df.copy(), columns)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
 
-    # Run imputation
-    orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask = (
-        imputer.impute()
-    )
+        # Run imputation
+        orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask = (
+            imputer.impute()
+        )
+        combined.to_csv(f"mice_combined.csv", index=False)
+        mask.to_csv(f"mice_mask.csv", index=False)
+        imp_vals.to_csv(f"mice_imputed.csv", index=False)
+
+        # Store in cache
+        imputation_store[cache_key] = {
+            "original": orig_vals,
+            "imputed": imp_vals,
+            "combined": combined,
+            "mask": mask,
+            "test_orig": test_orig,
+            "test_imp": test_imp,
+            "test_mask": test_mask,
+        }
 
     # Save imputed components separately for this session
     imputation_store[session_id] = {
@@ -384,12 +430,14 @@ def get_scatter_plot_data(
 
     imputed_df = imputation_store[session_id]["imputed"]
     mask_df = imputation_store[session_id].get("mask")
+    combined_df = imputation_store[session_id]["combined"]
 
     original_df = session_store.get(session_id)
+    original_df.to_csv(f"original_df.csv", index=False)
+    original_df["County Code"] = pd.to_numeric(original_df["County Code"], errors="coerce").astype("Int64")
+    mask_df["County Code"] = pd.to_numeric(mask_df["County Code"], errors="coerce").astype("Int64")
+    original_df = original_df.sort_values(by="County Code").reset_index(drop=True)
 
-    print(imputed_df.shape)
-    print(original_df.shape)
-    print(mask_df.shape)
     # original_df = imputation_store[session_id]["combined"]
     if original_df is None or x_column not in original_df.columns:
         raise HTTPException(status_code=400, detail="X column not found in original dataset.")
@@ -398,32 +446,31 @@ def get_scatter_plot_data(
         raise HTTPException(status_code=400, detail="Invalid y column.")
 
     points = []
-    # print(imputed_df)
-    # print(mask_df)
-    # print(len(imputed_df))
-    # print(len(original_df))
-    for idx in original_df.index:
-        x_val = original_df.at[idx, x_column] if idx in original_df.index else None
-        if idx in original_df.index and original_df.at[idx, y_column]:
-            y_val = original_df.at[idx, y_column]
+    if "County Code" not in mask_df.columns:
+        raise HTTPException(status_code=400, detail="'County Code' column not found in combined dataset.")
+
+    for county_code in mask_df["County Code"].dropna().unique():
+        county_row = original_df[original_df["County Code"] == county_code]
+        if county_row.empty:
+            print("AITIK: county_row is empty for County Code:", county_code)
+            continue
         else:
-            y_val = imputed_df.at[idx, y_column] if idx in imputed_df.index else None
-
-        # print(x_val, y_val)
-
+            x_val = county_row.iloc[0][x_column] if x_column in county_row.columns else None
+            idx = mask_df[mask_df["County Code"] == county_code].index[0]
+            y_val = combined_df.at[idx, y_column] if idx in combined_df.index else None
+    
+        
+    # for idx in original_df.index:
+    #     x_val = original_df.at[idx, x_column] if idx in original_df.index else None
+    #     if idx in combined_df.index and combined_df.at[idx, y_column]:
+    #         y_val = combined_df.at[idx, y_column] if idx in combined_df.index else None
+    
         if pd.isna(x_val) or pd.isna(y_val):
-            # print("temp")
             continue  # Skip missing
 
-        is_imputed = (
-            mask_df is not None
-            and y_column in mask_df.columns
-            and pd.notna(mask_df.at[idx, y_column])
-            and mask_df.at[idx, y_column]
-        )
-        # if is_imputed:
-        #     print("imputed", mask_df.at[idx, y_column], y_column, idx)
-        # print("y_val", y_val)
+        is_imputed = False
+        if mask_df is not None and y_column in mask_df.columns:
+            is_imputed = bool(mask_df[mask_df["County Code"] == county_code].iloc[0][y_column])
         points.append({
             "x": float(x_val),
             "y": float(y_val),
