@@ -11,10 +11,14 @@ interface Tab {
   emoji: string;
 }
 
+// const tabs: Tab[] = [
+//   { name: 'Data & Features', href: '/data-features', emoji: '📂' },
+//   { name: 'Imputation', href: '/imputation', emoji: '🧠' },
+//   { name: 'Analysis', href: '/analysis', emoji: '📊' },
+// ];
+
 const tabs: Tab[] = [
-  { name: 'Data & Features', href: '/data-features', emoji: '📂' },
-  { name: 'Imputation', href: '/imputation', emoji: '🧠' },
-  { name: 'Analysis', href: '/analysis', emoji: '📊' },
+  { name: 'Data & Features', href: '/data-features', emoji: '📂' }
 ];
 
 const Navbar: FC = () => {

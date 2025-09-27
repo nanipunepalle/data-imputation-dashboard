@@ -22,6 +22,8 @@ from gknn import gKNNImputer
 from customLabelEncoder import CustomLabelEncoder
 from featureImportance import FeatureImportance
 
+from typing import Optional
+
 app = FastAPI()
 
 # Enable CORS
@@ -39,6 +41,28 @@ session_store: Dict[str, pd.DataFrame] = {}
 imputation_store: Dict[str, Dict[str, pd.DataFrame]] = {}
 
 label_encoders: Dict[str, Dict[str, object]] = {}
+
+
+def _safe_numeric(s: pd.Series) -> pd.Series:
+    """Coerce to numeric, keeping NaNs for non-convertible values."""
+    if not pd.api.types.is_numeric_dtype(s):
+        return pd.to_numeric(s, errors="coerce")
+    return s
+
+def _linear_regression(x: np.ndarray, y: np.ndarray) -> Dict[str, float]:
+    """
+    Ordinary Least Squares for y = a*x + b, with R^2.
+    Returns: {"slope": a, "intercept": b, "r2": r2}
+    """
+    # x: (n,), y: (n,)
+    x_ = np.vstack([x, np.ones_like(x)]).T
+    a, b = np.linalg.lstsq(x_, y, rcond=None)[0]
+    y_hat = a * x + b
+    ss_res = np.sum((y - y_hat) ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r2 = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
+    return {"slope": float(a), "intercept": float(b), "r2": r2}
+# --- end helpers ---
 
 def get_merged_df(df):
     csv_file_2 = 'CDC time series/Z LatLong Overdose Mapping Tool Data counties separated.csv'
@@ -116,7 +140,7 @@ async def missingness_summary_api(session_id: str = Query(...)):
     df = session_store.get(session_id)
     if df is None or df.empty:
         raise HTTPException(
-            status_code=404, detail="No dataset found for this session."
+            status_code=400, detail="No dataset found for this session."
         )
 
     missing_percent = (df.isnull().mean() * 100).round(2)
@@ -286,7 +310,7 @@ async def impute_api(
     raw_df = session_store.get(session_id + 'raw')
     if df is None or df.empty:
         raise HTTPException(
-            status_code=404, detail="No dataset found for this session."
+            status_code=400, detail="No dataset found for this session."
         )
 
     try:
@@ -360,11 +384,39 @@ async def impute_api(
     }
 
 
+@app.post("/dataframe/impute/status")
+async def impute_status_api(
+    session_id: str = Form(...),
+    algo: str = Form(...),
+    columns: str = Form(...),
+    iterations: int = Form(...),
+):
+    df = session_store.get(session_id)
+    raw_df = session_store.get(session_id + 'raw')
+    if df is None or df.empty:
+        raise HTTPException(
+            status_code=400, detail="No dataset found for this session."
+        )
+
+    try:
+        columns = json.loads(columns)  # parse JSON array
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=400, detail="Invalid columns format. Expected a JSON list."
+        )
+    
+    print(f"Imputing with algo={algo}, columns={columns}, iterations={iterations}")
+    # Check cache for repeated calls
+    cache_key = f"{session_id}_{algo}_{json.dumps(columns)}_{iterations}"
+    if cache_key in imputation_store:
+        return True
+    return False
+
 @app.get("/dataframe/column_distribution")
 def get_column_distribution(session_id: str = Query(...), column: str = Query(...)):
     if session_id not in imputation_store:
         raise HTTPException(
-            status_code=404, detail="No imputation data for this session."
+            status_code=400, detail="No imputation data for this session."
         )
 
     original_df = imputation_store[session_id]["original"]
@@ -389,7 +441,7 @@ def get_test_evaluation(session_id: str = Query(...)):
     """
     if session_id not in imputation_store:
         raise HTTPException(
-            status_code=404, detail="No imputation data for this session."
+            status_code=400, detail="No imputation data for this session."
         )
 
     test_orig = imputation_store[session_id].get("test_orig")
@@ -483,6 +535,130 @@ def get_scatter_plot_data(
         "points": points
     }
 
+
+@app.get("/dataframe/preimpute/columns")
+def get_preimpute_numeric_like_columns(
+    session_id: str = Query(...),
+    use_raw: bool = Query(True, description="If True, use the raw uploaded CSV; if False, use merged pre-impute working DF."),
+    min_fraction_numeric: float = Query(
+        0.5, ge=0.0, le=1.0,
+        description="Keep columns where at least this fraction coerces to numeric"
+    )
+):
+    """
+    Returns numeric-like columns from the PRE-IMPUTATION dataset.
+    - If use_raw=True and you uploaded a CSV, we prefer session_id+'raw' (your original upload).
+    - Else we fall back to session_store[session_id] (your merged numeric-only pre-impute DF).
+    """
+    df: Optional[pd.DataFrame] = None
+
+    if use_raw and (session_id + 'raw') in session_store:
+        df = session_store.get(session_id + 'raw')
+    else:
+        df = session_store.get(session_id)
+
+    if df is None or df.empty:
+        raise HTTPException(status_code=400, detail="No pre-imputation dataset found for this session.")
+
+    numericish = []
+    for c in df.columns:
+        s = pd.to_numeric(df[c], errors="coerce")
+        if s.notna().mean() >= min_fraction_numeric:
+            numericish.append(c)
+
+    return {"columns": numericish}
+
+
+@app.get("/dataframe/preimpute/scatter")
+def get_preimpute_scatter(
+    session_id: str = Query(..., description="Session key"),
+    x_column: str = Query(...),
+    y_column: str = Query(...),
+    sample_size: Optional[int] = Query(
+        5000, ge=100, le=100000,
+        description="Optional uniform downsample for large datasets"
+    )
+):
+    """
+    Build a BEFORE-IMPUTATION scatter dataset from the MERGED pre-impute frame only.
+    - Uses session_store[session_id] (the merged, numeric-only pre-impute DF created in /dataframe/post).
+    - Drops rows where X or Y is NaN.
+    - Returns points [{x,y,label='Observed'}], correlation stats, OLS line, bounds, counts, and dropped record counts.
+    """
+    # Always use the merged pre-impute DF
+    df: Optional[pd.DataFrame] = session_store.get(session_id)
+
+    if df is None or df.empty:
+        raise HTTPException(status_code=400, detail="No pre-imputation dataset available for this session.")
+
+    # Validate columns
+    if x_column not in df.columns:
+        raise HTTPException(status_code=400, detail=f"X column '{x_column}' not found in pre-imputation dataset.")
+    if y_column not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Y column '{y_column}' not found in pre-imputation dataset.")
+
+    # Coerce to numeric but preserve NaNs for filtering
+    x = _safe_numeric(df[x_column])
+    y = _safe_numeric(df[y_column])
+
+    total_rows = len(df)
+    x_missing = int(x.isna().sum())
+    y_missing = int(y.isna().sum())
+    either_missing = int((x.isna() | y.isna()).sum())
+
+    # Pairwise complete cases for scatter
+    data = pd.DataFrame({"x": x, "y": y})
+    before = len(data)
+    data = data.dropna(subset=["x", "y"])
+    dropped = before - len(data)
+
+    if len(data) < 2:
+        raise HTTPException(status_code=400, detail="Not enough valid numeric pairs to compute scatter/correlation.")
+
+    # Optional downsample
+    if sample_size and len(data) > sample_size:
+        data = data.sample(n=sample_size, random_state=42)
+
+    # Stats
+    pearson = float(data["x"].corr(data["y"], method="pearson"))
+    spearman = float(data["x"].rank().corr(data["y"].rank(), method="pearson"))
+
+    x_vals = data["x"].to_numpy(dtype=float)
+    y_vals = data["y"].to_numpy(dtype=float)
+    if np.std(x_vals) > 0 and np.std(y_vals) > 0:
+        reg = _linear_regression(x_vals, y_vals)
+    else:
+        reg = {"slope": 0.0, "intercept": float(np.mean(y_vals)), "r2": 0.0}
+
+    points = [{"x": float(xx), "y": float(yy), "label": "Observed"}
+              for (xx, yy) in zip(data["x"].tolist(), data["y"].tolist())]
+
+    return {
+        "mode": "preimpute",
+        "source": "merged_preimpute",
+        "session_id": session_id,
+        "x_column": x_column,
+        "y_column": y_column,
+        "n": len(points),
+        "dropped": int(dropped),
+        "missing_counts": {
+            "total_rows": int(total_rows),
+            "x_missing": x_missing,
+            "y_missing": y_missing,
+            "either_missing": either_missing
+        },
+        "pearson": pearson,
+        "spearman": spearman,
+        "slope": reg["slope"],
+        "intercept": reg["intercept"],
+        "r2": reg["r2"],
+        "x_min": float(data["x"].min()),
+        "x_max": float(data["x"].max()),
+        "y_min": float(data["y"].min()),
+        "y_max": float(data["y"].max()),
+        "counts": {"observed": int(len(points)), "imputed": 0},
+        "points": points
+    }
 
 
 if __name__ == "__main__":

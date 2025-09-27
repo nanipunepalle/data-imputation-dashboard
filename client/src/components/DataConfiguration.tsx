@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import { Button, Upload, Select, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
@@ -47,50 +47,81 @@ const DataConfiguration: React.FC<DatasetUploadProps> = ({
     setError,
   } = useDatasetStore();
 
+  // Prevent double init in React 18 StrictMode
+  const didInitRef = useRef(false);
+
+  // Reusable CSV parse + state setter
+  const parseFileAndSetState = async (file: File) =>
+    new Promise<void>((resolve, reject) => {
+      Papa.parse(file, {
+        header: false,
+        skipEmptyLines: true,
+        complete: (result) => {
+          const parsedData = result.data as string[][];
+          if (parsedData.length < 2) {
+            setError('CSV file is empty or invalid');
+            setIsUploaded(false);
+            reject(new Error('Empty/invalid CSV'));
+            return;
+          }
+
+          const parsedHeaders = parsedData[0];
+          const rows = parsedData.slice(1).map((row) =>
+            parsedHeaders.reduce((obj, header, i) => {
+              const value = row[i];
+              const num = Number(value);
+              (obj)[header] = isNaN(num) ? value : Math.round(num * 100) / 100;
+              return obj;
+            }, {} as DataRow)
+          );
+
+          onDataUpload({ headers: parsedHeaders, rows });
+          setError(null);
+          setFileName(file.name);
+          setIsUploaded(true);
+          resolve();
+        },
+        error: (err) => {
+          setError('Error parsing CSV file');
+          setIsUploaded(false);
+          reject(err);
+        },
+      });
+    });
 
   useEffect(() => {
-    if (!isUploaded) {
-      fetch('/sample.csv')
-        .then((res) => res.text())
-        .then((csvText) => {
-          Papa.parse(csvText, {
-            complete: (result) => {
-              const parsedData = result.data as string[][];
+    // If no file has been uploaded yet, fetch sample.csv, upload it to the server, and parse it.
+    if (didInitRef.current) return;
+    didInitRef.current = true;
 
-              if (parsedData.length < 2) {
-                setError('Default CSV file is empty or invalid');
-                return;
-              }
+    const initWithSample = async () => {
+      try {
+        if (isUploaded || uploadedFile) return;
 
-              const headers = parsedData[0];
-              const rows = parsedData.slice(1).map((row) =>
-                headers.reduce((obj, header, i) => {
-                  const value = row[i];
-                  const num = Number(value);
-                  obj[header] = isNaN(num) ? value : Math.round(num * 100) / 100;
-                  return obj;
-                }, {} as DataRow)
-              );
+        const res = await fetch('/sample.csv');
+        if (!res.ok) {
+          throw new Error(`Failed to fetch sample.csv: ${res.status}`);
+        }
 
-              onDataUpload({ headers, rows });
-              setError(null);
-              setFileName('sample.csv');
-              setIsUploaded(true);
-            },
-            header: false,
-            skipEmptyLines: true,
-            error: () => {
-              setError('Error parsing default CSV');
-            },
-          });
-        })
-        .catch((err) => {
-          setError('Failed to load sample dataset');
-          console.error(err);
-        });
-    }
-  }, []);
+        // Turn fetched blob into a File so it can be uploaded and parsed uniformly
+        const blob = await res.blob();
+        const sampleFile = new File([blob], 'sample.csv', { type: 'text/csv' });
 
+        setUploadedFile(sampleFile);
+
+        // 1) send to backend
+        await uploadDataset(sampleFile);
+
+        // 2) parse locally for preview
+        await parseFileAndSetState(sampleFile);
+      } catch (e) {
+        console.error(e);
+        setError('Failed to load or parse sample dataset');
+      }
+    };
+
+    void initWithSample();
+  }, [isUploaded, uploadedFile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileChange = async (file: File) => {
     if (!file.name.endsWith('.csv')) {
@@ -99,47 +130,19 @@ const DataConfiguration: React.FC<DatasetUploadProps> = ({
       return false;
     }
 
-    setUploadedFile(file);
-
     try {
+      setUploadedFile(file);
+      // send to backend
       await uploadDataset(file);
-    } catch (error) {
-      console.error('Error uploading file:', error);
+      // parse for preview
+      await parseFileAndSetState(file);
+      message.success(`Loaded ${file.name}`);
+    } catch (err) {
+      console.error('Error uploading/parsing file:', err);
+      // parseFileAndSetState already sets error when parsing fails
     }
 
-    Papa.parse(file, {
-      complete: (result) => {
-        const parsedData = result.data as string[][];
-        if (parsedData.length < 2) {
-          setError('CSV file is empty or invalid');
-          setIsUploaded(false);
-          return;
-        }
-
-        const headers = parsedData[0];
-        const rows = parsedData.slice(1).map((row) =>
-          headers.reduce((obj, header, i) => {
-            const value = row[i];
-            const num = Number(value);
-            obj[header] = isNaN(num) ? value : Math.round(num * 100) / 100;
-            return obj;
-          }, {} as DataRow)
-        );
-
-        onDataUpload({ headers, rows });
-        setError(null);
-        setFileName(file.name);
-        setIsUploaded(true);
-        return false;
-      },
-      header: false,
-      skipEmptyLines: true,
-      error: () => {
-        setError('Error parsing CSV file');
-        setIsUploaded(false);
-      },
-    });
-
+    // prevent antd Upload from auto-uploading
     return false;
   };
 
@@ -159,38 +162,8 @@ const DataConfiguration: React.FC<DatasetUploadProps> = ({
 
       {isUploaded && (
         <div>
-          <div className={styles.dropdownGroup}>
-            <div className={styles.dropdownItem}>
-              <label>Target Column</label>
-              <Select
-                value={targetColumn}
-                onChange={setTargetColumn}
-                placeholder="Select Target"
-              >
-                {headers.map((header) => (
-                  <Option key={header} value={header}>
-                    {header}
-                  </Option>
-                ))}
-              </Select>
-            </div>
-            <div className={styles.dropdownItem}>
-              <label>ID Column</label>
-              <Select
-                value={idColumn}
-                onChange={setIdColumn}
-                placeholder="Select ID"
-              >
-                {headers.map((header) => (
-                  <Option key={header} value={header}>
-                    {header}
-                  </Option>
-                ))}
-              </Select>
-            </div>
-          </div>
           <div className={styles.tableSection}>
-            <DataPreview></DataPreview>
+            <DataPreview />
           </div>
         </div>
       )}
@@ -213,21 +186,31 @@ const DataConfiguration: React.FC<DatasetUploadProps> = ({
       tooltipContent={
         <div style={{ maxWidth: 300 }}>
           <p><strong>Data Configuration</strong> allows you to upload a dataset and select the target and ID columns.</p>
-          <p>You can also open the modal to configure column data types.</p>
+          <p>If nothing is uploaded, a built-in sample is loaded and also sent to the server.</p>
         </div>
       }
-      controls={
-        <Button
-          type="link"
-          size="small"
-          disabled={!isUploaded}
-          onClick={() => setIsModalOpen(true)}
-        >
-          Configure Data Type
-        </Button>
-      }
+      // controls={
+      //   <Button
+      //     type="link"
+      //     size="small"
+      //     disabled={!isUploaded}
+      //     onClick={() => setIsModalOpen(true)}
+      //   >
+      //     Configure Data Type
+      //   </Button>
+      // }
       inModal={inModal}
-      modalContent={<DataConfiguration onDataUpload={onDataUpload} headers={headers} targetColumn={targetColumn} setTargetColumn={setTargetColumn} idColumn={idColumn} setIdColumn={setIdColumn} inModal={true}></DataConfiguration>}
+      modalContent={
+        <DataConfiguration
+          onDataUpload={onDataUpload}
+          headers={headers}
+          targetColumn={targetColumn}
+          setTargetColumn={setTargetColumn}
+          idColumn={idColumn}
+          setIdColumn={setIdColumn}
+          inModal={true}
+        />
+      }
     >
       {content}
     </ChartWrapper>

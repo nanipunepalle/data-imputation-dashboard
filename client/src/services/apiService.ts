@@ -208,9 +208,81 @@ export async function fetchTestEvaluation(): Promise<TestEvaluationResponse> {
 }
 
 export const fetchScatterPlotData = async (xColumn: string, yColumn: string) => {
-    const sessionId = localStorage.getItem("session_id"); // or wherever it's stored
-    const res = await fetch(`${API_BASE_URL}/dataframe/scatter_plot_data?session_id=${sessionId}&x_column=${xColumn}&y_column=${yColumn}`);
-    if (!res.ok) throw new Error("Failed to fetch scatter plot data");
-    return await res.json();
+  const sessionId = localStorage.getItem("session_id"); // or wherever it's stored
+  const res = await fetch(`${API_BASE_URL}/dataframe/scatter_plot_data?session_id=${sessionId}&x_column=${xColumn}&y_column=${yColumn}`);
+  if (!res.ok) throw new Error("Failed to fetch scatter plot data");
+  return await res.json();
 };
 
+export const fetchImputationStatus = async ({
+  algo,
+  columns,
+  iterations,
+}: {
+  algo: string;
+  columns: string[];
+  iterations: number;
+}) => {
+  const sessionId = getSessionId();
+  const formData = new FormData();
+  formData.append('session_id', sessionId);
+  formData.append('algo', algo.toLowerCase());
+  formData.append('columns', JSON.stringify(columns));
+  formData.append('iterations', iterations.toString());
+
+  const response = await axios.post(`${API_BASE_URL}/dataframe/impute/status`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  console.log(response)
+
+  return response.data;
+}
+
+// ---- Replace your existing two functions with these ----
+
+export async function fetchPreimputeColumns(params: { use_raw?: boolean } = {}): Promise<string[]> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/preimpute/columns`, {
+      params: {
+        session_id: getSessionId(),
+        use_raw: params.use_raw ?? true,
+      },
+    });
+    return response.data?.columns ?? [];
+  } catch (error) {
+    console.error('Error fetching pre-impute columns:', error);
+    throw error;
+  }
+}
+
+interface PreimputeScatterParams {
+  x_column: string;
+  y_column: string;
+  sample_size?: number;
+}
+
+export async function fetchPreimputeScatter(params: PreimputeScatterParams) {
+  if (!params?.x_column || !params?.y_column) {
+    throw new Error('x_column and y_column are required');
+  }
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/preimpute/scatter`, {
+      params: {
+        session_id: getSessionId(),
+        x_column: params.x_column,
+        y_column: params.y_column,
+        ...(params.sample_size ? { sample_size: params.sample_size } : {}),
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching pre-impute scatter:', error?.response?.data ?? error);
+    // Surface backend error details if present
+    throw new Error(
+      (error?.response?.data && typeof error.response.data === 'string')
+        ? error.response.data
+        : 'Failed to fetch pre-impute scatter'
+    );
+  }
+}

@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { Radio, Select, InputNumber, Button, Progress } from 'antd';
 import ChartWrapper from '@/components/ChartWrapper';
 import styles from '@/styles/ImputationConfiguration.module.css';
-import { fetchDataTypes, fetchMissingnessSummary, runImputation } from '@/services/apiService';
+import { fetchDataTypes, fetchImputationMask, fetchImputationStatus, fetchMissingnessSummary, runImputation } from '@/services/apiService';
 import { useDatasetStore } from '@/store/useDataStore';
+import MissingnessSummaryChart from './MissingnessSummaryChart';
 
 const { Option } = Select;
 const algorithms = ['gKNN', 'MICE', 'BART'];
@@ -28,22 +29,70 @@ const ImputationConfiguration: React.FC = () => {
 
     const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
 
+    // Load columns that have missingness
     useEffect(() => {
-
-
         const loadColumns = async () => {
             try {
-                fetchMissingnessSummary().then(summary => {
-                    const cols = summary.filter(s => s.percent > 0).map(s => s.feature);
-                    setColumns(cols);
-                });
+                const summary = await fetchMissingnessSummary();
+                const cols = summary.filter((s: any) => s.percent > 0).map((s: any) => s.feature);
+                setColumns(cols);
             } catch (error) {
                 console.error('Failed to fetch columns:', error);
+                setColumns([]);
             }
         };
-
         loadColumns();
     }, [dataset]);
+
+    // Default the Target dropdown to the first available column (and keep it valid when columns update)
+    useEffect(() => {
+        if (columns.length === 0) {
+            setTarget(undefined);
+            return;
+        }
+
+        // If nothing selected yet, pick the first column
+        if (typeof target === 'undefined') {
+            setTarget(type === 'Multiple' ? [columns[0]] : columns[0]);
+            return;
+        }
+
+        // If current selection is now invalid due to dataset change, repair it
+        if (Array.isArray(target)) {
+            const filtered = target.filter((c) => columns.includes(c));
+            if (filtered.length === 0) {
+                setTarget([columns[0]]);
+            } else if (filtered.length !== target.length) {
+                setTarget(filtered);
+            }
+        } else {
+            if (!columns.includes(target)) {
+                setTarget(columns[0]);
+            }
+        }
+    }, [columns, type]);
+
+    useEffect(() => {
+        checkImputationStatus();
+    }, [dataset, columns, selectedAlgorithm])
+
+    const checkImputationStatus = async () => {
+        if (!target || !maxIteration || !sessionId) return;
+
+        const selectedColumns = Array.isArray(target) ? target : [target];
+
+        const resp = await fetchImputationStatus({
+            algo: selectedAlgorithm,
+            columns: selectedColumns,
+            iterations: maxIteration,
+        })
+
+        if (resp) {
+            handleRunImputation();
+            // console.log("updated")
+            // setUpdated(!isUpdated);
+        }
+    }
 
     const handleRunImputation = async () => {
         if (!target || !maxIteration || !sessionId) return;
@@ -106,20 +155,23 @@ const ImputationConfiguration: React.FC = () => {
                 </div>
 
                 <div className={styles.configPanel}>
-                    <div className={styles.formRow}>
-                        <label>Type:</label>
-                        <Radio.Group
-                            onChange={(e) => {
-                                setType(e.target.value);
-                                setTarget(undefined); // Reset selection
-                            }}
-                            value={type}
-                            className={styles.radioGroup}
-                        >
-                            <Radio value="Single">Single</Radio>
-                            <Radio value="Multiple">Multiple</Radio>
-                        </Radio.Group>
-                    </div>
+                    {/* If you want to enable Single/Multiple later, this block is ready */}
+                    {/*
+          <div className={styles.formRow}>
+            <label>Type:</label>
+            <Radio.Group
+              onChange={(e) => {
+                setType(e.target.value);
+                setTarget(undefined); // Reset selection so the default kicks in for the new mode
+              }}
+              value={type}
+              className={styles.radioGroup}
+            >
+              <Radio value="Single">Single</Radio>
+              <Radio value="Multiple">Multiple</Radio>
+            </Radio.Group>
+          </div>
+          */}
 
                     <div className={styles.formRow}>
                         <label>Target:</label>
@@ -127,8 +179,8 @@ const ImputationConfiguration: React.FC = () => {
                             mode={type === 'Multiple' ? 'multiple' : undefined}
                             style={{ width: '100%' }}
                             placeholder="Select column(s)"
-                            onChange={(value) => setTarget(value)}
-                            value={target}
+                            onChange={(value) => setTarget(value as any)}
+                            value={target as any}
                         >
                             {columns.map((col) => (
                                 <Option key={col} value={col}>
@@ -154,11 +206,15 @@ const ImputationConfiguration: React.FC = () => {
                         </Button>
                     </div>
 
-                    {loading && (
-                        <div className={styles.progressBar}>
-                            <Progress percent={progress} showInfo={false} status="active" />
-                        </div>
-                    )}
+                    {/* Optional: show a progress bar if you decide to re-enable it */}
+                    {/*
+          {loading && (
+            <div className={styles.progressBar}>
+              <Progress percent={progress} showInfo={false} status="active" />
+            </div>
+          )}
+          */}
+
                 </div>
             </div>
         </ChartWrapper>

@@ -6,7 +6,7 @@
 
 .tableContainer {
   height: 400px;
-  max-height: 24vh;
+  max-height: 28vh;
   /* height: 100%; */
   overflow: auto;
 }
