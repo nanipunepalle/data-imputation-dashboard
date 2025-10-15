@@ -1,19 +1,45 @@
+:root {
+  --navbar: 40px;
+  --gap: 8px;   /* space between boxes */
+  --edge: 8px;  /* space at top & bottom of each column */
+}
+
 .columnBox {
   padding: 4px;
   border: 1px solid #d9d9d9;
   border-radius: 8px;
-  height: 46vh;
-  min-height: 350px;
-  box-sizing: border-box;
+  box-sizing: border-box; /* height includes padding+border */
   display: flex;
   flex-direction: column;
-  margin-top: 8px;
+  background: #fff;
 }
 
-
-.configSection {
-  flex: 0 0 auto; /* take space based on content */
-  overflow: visible;
+/* Parent stack per column */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  /* adds space before the first and after the last box */
+  padding-block: var(--edge);
 }
 
+/* Total vertical spacing in a 3-box column:
+   2*edge (top+bottom) + 2*gap (between 3 boxes) */
+.thirdHeight {
+  height: calc((100vh - var(--navbar) - (2 * var(--edge)) - (2 * var(--gap))) / 3);
+  min-height: 200px;
+}
 
+/* Total vertical spacing in a 2-box column:
+   2*edge (top+bottom) + 1*gap (between 2 boxes) */
+.halfHeight {
+  height: calc((100vh - var(--navbar) - (2 * var(--edge)) - (1 * var(--gap))) / 2);
+  min-height: 350px;
+}
+
+.centerFill {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
