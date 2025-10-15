@@ -1,8 +1,4 @@
-:root {
-  --navbar: 40px;
-  --gap: 8px;   /* space between boxes */
-  --edge: 8px;  /* space at top & bottom of each column */
-}
+/* Root variables moved to globals.css */
 
 .columnBox {
   padding: 4px;

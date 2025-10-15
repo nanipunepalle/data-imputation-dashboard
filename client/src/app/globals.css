@@ -1,6 +1,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --navbar: 40px;
+  --gap: 8px;   /* space between boxes */
+  --edge: 8px;  /* space at top & bottom of each column */
 }
 
 /* @media (prefers-color-scheme: dark) {
