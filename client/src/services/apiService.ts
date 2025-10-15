@@ -286,3 +286,31 @@ export async function fetchPreimputeScatter(params: PreimputeScatterParams) {
     );
   }
 }
+
+export interface ScatterPoint {
+  x: number;
+  y: number;
+  label: string;
+}
+
+export interface MapDataResponse {
+  x_column: string;
+  y_column: string;
+  points: ScatterPoint[];
+}
+
+export async function fetchMapData(): Promise<MapDataResponse> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/scatter_plot_data`, {
+      params: {
+        session_id: getSessionId(),
+        x_column: 'County Code',
+        y_column: 'Deaths_per_100k',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching map data:', error);
+    throw error;
+  }
+}
