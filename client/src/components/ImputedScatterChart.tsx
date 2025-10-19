@@ -202,7 +202,7 @@ const ImputedScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
 
     return (
         <ChartWrapper
-            title="Scatter Plot: Original vs Imputed Values"
+            title="Scatter Plot: Rest vs Imputed Values"
             tooltipContent={<p>Scatter plot showing original vs. imputed values for the selected feature.</p>}
             modalContent={<ImputedScatterPlot inModal />}
             inModal={inModal}

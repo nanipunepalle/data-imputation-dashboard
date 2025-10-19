@@ -2,118 +2,99 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { Select, Spin, Switch, Typography, Space } from 'antd';
+import { Select, Spin, Typography } from 'antd';
 import ChartWrapper from '@/components/ChartWrapper';
 import { useDatasetStore } from '@/store/useDataStore';
-import { fetchDataTypes, fetchPreimputeColumns, fetchPreimputeScatter } from '@/services/apiService';
+import { fetchDataTypes, fetchPreimputeScatter } from '@/services/apiService';
 
 const { Text } = Typography;
 
-const ACCENT = '#0072B2';
+const COLOR_OBS = '#0072B2';      // Observed (target present)
+const COLOR_MISS = '#D55E00';     // Target missing
+
+type ScatterResp = {
+  mode?: 'preimpute';
+  source?: 'raw' | 'merged_preimpute';
+  session_id?: string;
+  x_column: string;
+  y_column: string;
+  target_column?: string;
+  x_min: number; x_max: number;
+  y_min: number; y_max: number;
+  n: number; dropped: number;
+  pearson: number; spearman: number; r2: number;
+  slope: number; intercept: number;
+  points: Array<{ x: number; y: number; label: 'Observed' | 'ImputeTargetMissing' }>;
+  missing_counts?: {
+    total_rows: number; x_missing: number; y_missing: number; either_missing: number;
+    target_missing_total?: number; target_missing_in_scatter?: number;
+  };
+  counts?: { observed?: number; impute_target_missing?: number };
+  legend?: string[];
+};
 
 const PreImputeScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
-  const { dataset, isUpdated } = useDatasetStore(); // keep parity with your pattern
+  const { dataset, isUpdated } = useDatasetStore();
+
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [columns, setColumns] = useState<string[]>([]);
   const [xCol, setXCol] = useState<string | null>(null);
   const [yCol, setYCol] = useState<string | null>(null);
-  // const [useRaw, setUseRaw] = useState<boolean>(true);
+  const [targetCol, setTargetCol] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
-
-  // payload from API
-  const [resp, setResp] = useState<{
-    x_column: string;
-    y_column: string;
-    x_min: number; x_max: number;
-    y_min: number; y_max: number;
-    n: number; dropped: number;
-    pearson: number; spearman: number; r2: number;
-    slope: number; intercept: number;
-    points: Array<{ x: number; y: number; label: string }>;
-    missing_counts?: { total_rows: number; x_missing: number; y_missing: number; either_missing: number; };
-    source?: 'raw' | 'merged_preimpute';
-  } | null>(null);
-
-  // Load pre-impute numeric-ish columns (match your no-arg service call style)
-  // useEffect(() => {
-  //   let cancelled = false;
-  //   (async () => {
-  //     const cols = await fetchPreimputeColumns({ use_raw: useRaw }).catch(() => []);
-  //     if (cancelled) return;
-  //     setColumns(cols);
-  //     if (cols.length >= 2) {
-  //       setXCol(prev => prev ?? cols[0]);
-  //       setYCol(prev => prev ?? cols[1]);
-  //     } else {
-  //       setXCol(null);
-  //       setYCol(null);
-  //     }
-  //   })();
-  //   return () => { cancelled = true; };
-  // }, [dataset, isUpdated, useRaw]);
+  const [resp, setResp] = useState<ScatterResp | null>(null);
 
   // Load ALL columns from dtypes
-      useEffect(() => {
-          let cancelled = false;
-          (async () => {
-              try {
-                  const dtypes = await fetchDataTypes(); // Record<string, string>
-                  const cols = Object.keys(dtypes);
-                  if (!cancelled) {
-                      setColumns(cols);
-                  }
-              } catch (err) {
-                  console.error('Error loading dtypes:', err);
-                  if (!cancelled) setColumns([]);
-              }
-          })();
-          return () => {
-              cancelled = true;
-          };
-      }, [dataset, isUpdated]);
-
-      useEffect(() => {
-        if (columns.length > 0) {
-            if (!xCol || !columns.includes(xCol)) {
-                setXCol(columns[0]);
-            }
-        } else {
-            setXCol(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const dtypes = await fetchDataTypes(); // Record<string,string>
+        const cols = Object.keys(dtypes);
+        if (!cancelled) {
+          setColumns(cols);
+          // default selections if unset or invalid
+          if (!xCol || !cols.includes(xCol)) setXCol(cols[0] ?? null);
+          if (!yCol || !cols.includes(yCol)) setYCol(cols[1] ?? cols[0] ?? null);
+          if (!targetCol || !cols.includes(targetCol)) setTargetCol(cols[2] ?? cols[0] ?? null);
         }
-    }, [columns]);
-
-    useEffect(() => {
-        if (columns.length > 0) {
-            if (!yCol || !columns.includes(yCol)) {
-                setYCol(columns[0]);
-            }
-        } else {
-            setYCol(null);
-        }
-    }, [columns]);
+      } catch (err) {
+        console.error('Error loading dtypes:', err);
+        if (!cancelled) setColumns([]);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset, isUpdated]);
 
   // Fetch scatter when selections change
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!xCol || !yCol) {
+      if (!xCol || !yCol || !targetCol) {
         setResp(null);
         return;
       }
       setLoading(true);
       try {
-        const r = await fetchPreimputeScatter({ x_column: xCol, y_column: yCol });
+        const r = await fetchPreimputeScatter({
+          x_column: xCol,
+          y_column: yCol,
+          target_column: targetCol, // NEW
+        });
         if (!cancelled) setResp(r);
-      } catch {
+      } catch (e) {
+        console.error(e);
         if (!cancelled) setResp(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [xCol, yCol, dataset, isUpdated]);
+  }, [xCol, yCol, targetCol, dataset, isUpdated]);
 
   // Draw scatter
   useEffect(() => {
@@ -142,7 +123,7 @@ const PreImputeScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
         .attr('y', innerH / 2)
         .attr('text-anchor', 'middle')
         .style('font-size', 13)
-        .text('Select X and Y to render pre-imputation scatter');
+        .text('Select X, Y and Target to render pre-imputation scatter');
       return;
     }
 
@@ -177,6 +158,11 @@ const PreImputeScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
       .style('font-size', 12)
       .text(resp.y_column);
 
+    // Color by label
+    const color = d3.scaleOrdinal<string, string>()
+      .domain(['Observed', 'ImputeTargetMissing'])
+      .range([COLOR_OBS, COLOR_MISS]);
+
     // Points (adaptive radius for density)
     const r = Math.max(1.5, Math.min(3.5, 1500 / resp.points.length));
     g.selectAll('circle.point')
@@ -188,99 +174,112 @@ const PreImputeScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
       .attr('cy', d => yScale(d.y))
       .attr('r', r)
       .attr('opacity', 0.8)
-      .attr('fill', ACCENT); 
+      .attr('fill', d => color(d.label));
 
-    // OLS line
-    // if (Number.isFinite(resp.slope) && Number.isFinite(resp.intercept)) {
-    //   const x0 = resp.x_min, x1 = resp.x_max;
-    //   const y0 = resp.slope * x0 + resp.intercept;
-    //   const y1 = resp.slope * x1 + resp.intercept;
-
-    //   g.append('line')
-    //     .attr('x1', xScale(x0))
-    //     .attr('x2', xScale(x1))
-    //     .attr('y1', yScale(y0))
-    //     .attr('y2', yScale(y1))
-    //     .attr('stroke-width', 1.5)
-    //     .attr('stroke-dasharray', '5,4')
-    //     .attr('stroke', ACCENT); 
-    // }
-
-    // Corner stats (top-right)
-    const stats = [
-      `n: ${resp.n} (dropped: ${resp.dropped})`,
-      `pearson: ${resp.pearson.toFixed(3)}`,
-      `spearman: ${resp.spearman.toFixed(3)}`,
-      `R²: ${resp.r2.toFixed(3)}`
+    // Legend (top-left)
+    const legend = [
+      { label: 'Observed', color: COLOR_OBS },
+      { label: 'Missing Target', color: COLOR_MISS },
     ];
-    const statsG = g.append('text')
-      .attr('x', innerW)
-      .attr('y', 0)
-      .attr('text-anchor', 'end')
-      .attr('dy', '1em')
-      .style('font-size', 11);
 
-    statsG.selectAll('tspan')
-      .data(stats)
+    const legendWidth = 80;
+    const rowH = 16;
+    const lg = g.append('g')
+      .attr('transform', `translate(${innerW - legendWidth}, 0)`);
+
+    lg.selectAll('rect.leg')
+      .data(legend)
       .enter()
-      .append('tspan')
-      .attr('x', innerW)
-      .attr('dy', (_, i) => (i === 0 ? 0 : 14))
-      .text(d => d);
+      .append('rect')
+      .attr('class', 'leg')
+      .attr('x', 0)
+      .attr('y', (_, i) => i * rowH + 2)
+      .attr('width', 10)
+      .attr('height', 10)
+      .attr('fill', d => d.color);
+
+    lg.selectAll('text.legt')
+      .data(legend)
+      .enter()
+      .append('text')
+      .attr('class', 'legt')
+      .attr('x', 16)
+      .attr('y', (_, i) => i * rowH + 11)
+      .style('font-size', 11)
+      .text(d => d.label);
 
   }, [resp, inModal]);
 
   return (
     <ChartWrapper
-      title="Scatter Plot: Pre-Imputation Relationship"
+      title="Scatter Plot: Pre-Imputation"
       tooltipContent={
         <p>
-          Scatter of <b>original (pre-impute)</b> values for the selected X and Y.
-          Rows with missing X or Y are dropped; OLS line and correlations shown.
+          Scatter of <b>original (pre-impute)</b> values for X and Y. Rows with missing X or Y are dropped.
+          Points are colored by whether the <b>Target</b> column is missing on that row.
         </p>
       }
       modalContent={<PreImputeScatterPlot inModal />}
       inModal={inModal}
       fixed={true}
+      controls={
+        <Select
+          size="small"
+          style={{ width: 150, marginLeft: 8 }}
+          placeholder="Select target (to impute)"
+          value={targetCol ?? undefined}
+          onChange={setTargetCol}
+          showSearch
+          filterOption={(input, option) =>
+            ((option?.label as string) ?? '').toLowerCase().includes(input.toLowerCase())
+          }
+        >
+          {columns.map(col => (
+            <Select.Option key={col} value={col}>{col}</Select.Option>
+          ))}
+        </Select>
+      }
     >
-      <div style={{ display: 'flex', gap: '0.5rem', padding: '10px' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', padding: '10px', flexWrap: 'wrap' }}>
         <div>
           <Text type="secondary">X</Text>
           <Select
             size="small"
-            style={{ width: 180, marginLeft: 8 }}
+            style={{ width: 200, marginLeft: 8 }}
             placeholder="Select X"
             value={xCol ?? undefined}
             onChange={setXCol}
             showSearch
-            filterOption={(i, o) => (o?.label as string).toLowerCase().includes(i.toLowerCase())}
+            filterOption={(input, option) =>
+              ((option?.label as string) ?? '').toLowerCase().includes(input.toLowerCase())
+            }
           >
             {columns.map(col => (
-              <Select.Option key={col} value={col}>
-                {col}
-              </Select.Option>
+              <Select.Option key={col} value={col}>{col}</Select.Option>
             ))}
           </Select>
         </div>
+
         <div>
           <Text type="secondary">Y</Text>
           <Select
             size="small"
-            style={{ width: 180, marginLeft: 8 }}
+            style={{ width: 200, marginLeft: 8 }}
             placeholder="Select Y"
             value={yCol ?? undefined}
             onChange={setYCol}
             showSearch
-            filterOption={(i, o) => (o?.label as string).toLowerCase().includes(i.toLowerCase())}
+            filterOption={(input, option) =>
+              ((option?.label as string) ?? '').toLowerCase().includes(input.toLowerCase())
+            }
           >
             {columns.map(col => (
-              <Select.Option key={col} value={col}>
-                {col}
-              </Select.Option>
+              <Select.Option key={col} value={col}>{col}</Select.Option>
             ))}
           </Select>
         </div>
       </div>
+
       <div ref={containerRef} style={{ flex: 1 }}>
         <Spin spinning={loading}>
           <svg ref={svgRef} width="100%" height="100%" />

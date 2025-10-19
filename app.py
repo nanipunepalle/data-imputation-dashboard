@@ -574,6 +574,7 @@ def get_preimpute_scatter(
     session_id: str = Query(..., description="Session key"),
     x_column: str = Query(...),
     y_column: str = Query(...),
+    target_column: str = Query(..., description="Column to assess for missingness (planned imputation target)"),
     sample_size: Optional[int] = Query(
         5000, ge=100, le=100000,
         description="Optional uniform downsample for large datasets"
@@ -582,8 +583,11 @@ def get_preimpute_scatter(
     """
     Build a BEFORE-IMPUTATION scatter dataset from the MERGED pre-impute frame only.
     - Uses session_store[session_id] (the merged, numeric-only pre-impute DF created in /dataframe/post).
-    - Drops rows where X or Y is NaN.
-    - Returns points [{x,y,label='Observed'}], correlation stats, OLS line, bounds, counts, and dropped record counts.
+    - Drops rows where X or Y is NaN (pairwise complete for plotting).
+    - Labels each plotted point by whether `target_column` is missing on that row:
+        * label='ImputeTargetMissing' if target_column is NaN
+        * label='Observed' otherwise
+    - Returns points [{x,y,label}], correlation stats, OLS line, bounds, counts (by label), and dropped record counts.
     """
     # Always use the merged pre-impute DF
     df: Optional[pd.DataFrame] = session_store.get(session_id)
@@ -592,19 +596,22 @@ def get_preimpute_scatter(
         raise HTTPException(status_code=400, detail="No pre-imputation dataset available for this session.")
 
     # Validate columns
-    if x_column not in df.columns:
-        raise HTTPException(status_code=400, detail=f"X column '{x_column}' not found in pre-imputation dataset.")
-    if y_column not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Y column '{y_column}' not found in pre-imputation dataset.")
+    for col_name, col_label in [(x_column, "X"), (y_column, "Y"), (target_column, "Target")]:
+        if col_name not in df.columns:
+            raise HTTPException(status_code=400, detail=f"{col_label} column '{col_name}' not found in pre-imputation dataset.")
 
     # Coerce to numeric but preserve NaNs for filtering
     x = _safe_numeric(df[x_column])
     y = _safe_numeric(df[y_column])
 
+    # Target column is only used for missingness labeling; don't coerce to numeric
+    target = df[target_column]
+
     total_rows = len(df)
     x_missing = int(x.isna().sum())
     y_missing = int(y.isna().sum())
     either_missing = int((x.isna() | y.isna()).sum())
+    target_missing_total = int(target.isna().sum())
 
     # Pairwise complete cases for scatter
     data = pd.DataFrame({"x": x, "y": y})
@@ -615,9 +622,15 @@ def get_preimpute_scatter(
     if len(data) < 2:
         raise HTTPException(status_code=400, detail="Not enough valid numeric pairs to compute scatter/correlation.")
 
-    # Optional downsample
+    # Align target-missing mask to the filtered scatter rows
+    target_missing_mask = target.isna()
+    target_missing_on_scatter = target_missing_mask.loc[data.index]
+
+    # Optional downsample (do this *after* labeling counts are computed against the same subset)
     if sample_size and len(data) > sample_size:
+        # Keep indices to resample mask consistently
         data = data.sample(n=sample_size, random_state=42)
+        target_missing_on_scatter = target_missing_on_scatter.loc[data.index]
 
     # Stats
     pearson = float(data["x"].corr(data["y"], method="pearson"))
@@ -630,8 +643,16 @@ def get_preimpute_scatter(
     else:
         reg = {"slope": 0.0, "intercept": float(np.mean(y_vals)), "r2": 0.0}
 
-    points = [{"x": float(xx), "y": float(yy), "label": "Observed"}
-              for (xx, yy) in zip(data["x"].tolist(), data["y"].tolist())]
+    # Build labeled points
+    labels = np.where(target_missing_on_scatter.values, "ImputeTargetMissing", "Observed")
+    points = [
+        {"x": float(xx), "y": float(yy), "label": str(lbl)}
+        for (xx, yy, lbl) in zip(data["x"].tolist(), data["y"].tolist(), labels.tolist())
+    ]
+
+    # Counts by label on the plotted subset
+    count_missing_plotted = int(target_missing_on_scatter.sum())
+    count_observed_plotted = int(len(data) - count_missing_plotted)
 
     return {
         "mode": "preimpute",
@@ -639,13 +660,16 @@ def get_preimpute_scatter(
         "session_id": session_id,
         "x_column": x_column,
         "y_column": y_column,
+        "target_column": target_column,
         "n": len(points),
         "dropped": int(dropped),
         "missing_counts": {
             "total_rows": int(total_rows),
             "x_missing": x_missing,
             "y_missing": y_missing,
-            "either_missing": either_missing
+            "either_missing": either_missing,
+            "target_missing_total": target_missing_total,
+            "target_missing_in_scatter": count_missing_plotted
         },
         "pearson": pearson,
         "spearman": spearman,
@@ -656,10 +680,13 @@ def get_preimpute_scatter(
         "x_max": float(data["x"].max()),
         "y_min": float(data["y"].min()),
         "y_max": float(data["y"].max()),
-        "counts": {"observed": int(len(points)), "imputed": 0},
-        "points": points
+        "counts": {
+            "observed": count_observed_plotted,
+            "impute_target_missing": count_missing_plotted
+        },
+        "points": points,
+        "legend": ["Observed", "ImputeTargetMissing"]
     }
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
