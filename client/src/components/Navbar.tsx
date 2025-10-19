@@ -4,6 +4,7 @@ import { FC } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu } from 'antd';
+import GeoMapModal from './GeoMapModal';
 
 interface Tab {
   name: string;
@@ -30,16 +31,19 @@ const Navbar: FC = () => {
   }));
 
   return (
-    <Menu
-      mode="horizontal"
-      selectedKeys={[pathname]}
-      items={menuItems}
-      style={{
-        borderBottom: '1px solid #f0f0f0',
-        maxHeight: '40px',
-        overflow: 'hidden'
-      }}
-    />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <Menu
+        mode="horizontal"
+        selectedKeys={[pathname]}
+        items={menuItems}
+        style={{
+          borderBottom: '1px solid #f0f0f0',
+          maxHeight: '40px',
+          overflow: 'hidden'
+        }}
+      />
+      <GeoMapModal />
+    </div>
   );
 };
 
