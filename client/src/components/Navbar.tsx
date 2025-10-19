@@ -31,19 +31,16 @@ const Navbar: FC = () => {
   }));
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <Menu
-        mode="horizontal"
-        selectedKeys={[pathname]}
-        items={menuItems}
-        style={{
-          borderBottom: '1px solid #f0f0f0',
-          maxHeight: '40px',
-          overflow: 'hidden'
-        }}
-      />
-      <GeoMapModal />
-    </div>
+    <Menu
+      mode="horizontal"
+      selectedKeys={[pathname]}
+      items={menuItems}
+      style={{
+        borderBottom: '1px solid #f0f0f0',
+        maxHeight: '40px',
+        overflow: 'hidden'
+      }}
+    />
   );
 };
 

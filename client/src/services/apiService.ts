@@ -292,7 +292,7 @@ export async function fetchPreimputeScatter(params: PreimputeScatterParams) {
 export interface ScatterPoint {
   x: number;
   y: number;
-  label: string;
+  label?: 'Imputed'|'Rest';
 }
 
 export interface MapDataResponse {
