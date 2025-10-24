@@ -200,9 +200,14 @@ def writeImputation(cdc_file, socio_columns_data, distance_matrix, k):
     cdc_file['Deaths_per_100k'] = pd.to_numeric(cdc_file['Deaths_per_100k'], errors='coerce')
     orig_values = cdc_file['Deaths_per_100k'].dropna()
 
-    missing_indices = cdc_file[(cdc_file['Deaths_per_100k'].isna()) & (cdc_file['Socio_Index'].notna())].index
+    missing_mask = cdc_file['Deaths_per_100k'].isna() & cdc_file['Socio_Index'].notna()
+    missing_indices = cdc_file.index[missing_mask]
+    # missing_indices = cdc_file[(cdc_file['Deaths_per_100k'].isna()) & (cdc_file['Socio_Index'].notna())].index
     print("missing_indices: ", len(missing_indices))
     
+    # everything else (either Deaths_per_100k present or Socio_Index missing)
+    non_missing_indices = cdc_file.index[~missing_mask]
+
     #cdc_file['Death Rate'] = cdc_file['Crude Rate'].copy()
     cdc_file['Imputed Deaths'] = cdc_file['Deaths'].copy()
     cdc_file['Imputed'] = 0
@@ -210,7 +215,7 @@ def writeImputation(cdc_file, socio_columns_data, distance_matrix, k):
     imputed_values_dict = {}
     all_neighbor_map = {}
     for idx in missing_indices:
-        imputed_value, neighbor_map = impute_death_rate(idx, cdc_file, distance_matrix, k)
+        imputed_value, neighbor_map = impute_death_rate(idx, cdc_file, distance_matrix, k, allowed_indices=non_missing_indices)
         all_neighbor_map.update(neighbor_map)
         # print(imputed_value)
         if not pd.isna(imputed_value):
@@ -250,6 +255,7 @@ def writeImputation(cdc_file, socio_columns_data, distance_matrix, k):
     # print(f"Imputed results written to: {updated_file_path}")
     imp_values = cdc_file.loc[missing_indices, 'Deaths_per_100k']
     combined = cdc_file["Deaths_per_100k"].copy()
+    print(len(all_neighbor_map))
     
 
     return all_neighbor_map, imputed_values_dict, combined, imp_values, orig_values, missing_indices.to_frame()
