@@ -4,9 +4,16 @@ import { useEffect, useState } from 'react';
 import { Radio, Select, InputNumber, Button, Progress } from 'antd';
 import ChartWrapper from '@/components/ChartWrapper';
 import styles from '@/styles/ImputationConfiguration.module.css';
-import { fetchDataTypes, fetchImputationMask, fetchImputationStatus, fetchMissingnessSummary, runImputation } from '@/services/apiService';
+import {
+    fetchDataTypes,
+    fetchImputationMask,
+    fetchImputationStatus,
+    fetchMissingnessSummary,
+    runImputation
+} from '@/services/apiService';
 import { useDatasetStore } from '@/store/useDataStore';
 import MissingnessSummaryChart from './MissingnessSummaryChart';
+import GeoMapModal from './GeoMapModal';
 
 const { Option } = Select;
 const algorithms = ['gKNN', 'MICE', 'BART'];
@@ -26,6 +33,7 @@ const ImputationConfiguration: React.FC = () => {
     const [progress, setProgress] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [columns, setColumns] = useState<string[]>([]);
+    const [imputationReady, setImputationReady] = useState(false); // ✅ controls Map visibility
 
     const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
 
@@ -51,13 +59,11 @@ const ImputationConfiguration: React.FC = () => {
             return;
         }
 
-        // If nothing selected yet, pick the first column
         if (typeof target === 'undefined') {
             setTarget(type === 'Multiple' ? [columns[0]] : columns[0]);
             return;
         }
 
-        // If current selection is now invalid due to dataset change, repair it
         if (Array.isArray(target)) {
             const filtered = target.filter((c) => columns.includes(c));
             if (filtered.length === 0) {
@@ -72,27 +78,41 @@ const ImputationConfiguration: React.FC = () => {
         }
     }, [columns, type]);
 
+    // Check imputation status whenever inputs change
     useEffect(() => {
         checkImputationStatus();
-    }, [dataset, columns, selectedAlgorithm])
+    }, [dataset, columns, selectedAlgorithm, target, maxIteration, sessionId, isUpdated]);
 
     const checkImputationStatus = async () => {
+        // Reset to false by default
+        setImputationReady(false);
+
         if (!target || !maxIteration || !sessionId) return;
 
         const selectedColumns = Array.isArray(target) ? target : [target];
 
-        const resp = await fetchImputationStatus({
-            algo: selectedAlgorithm,
-            columns: selectedColumns,
-            iterations: maxIteration,
-        })
+        try {
+            const resp = await fetchImputationStatus({
+                algo: selectedAlgorithm,
+                columns: selectedColumns,
+                iterations: maxIteration,
+            });
 
-        if (resp) {
-            handleRunImputation();
-            // console.log("updated")
-            // setUpdated(!isUpdated);
+            // Be tolerant of different response shapes:
+            // - boolean
+            // - { done: boolean } or { isDone: boolean } or { status: 'done'|'pending' }
+            const ready =
+                resp === true ||
+                resp?.done === true ||
+                resp?.isDone === true ||
+                (typeof resp?.status === 'string' && resp.status.toLowerCase() === 'done');
+
+            setImputationReady(!!ready);
+        } catch (e) {
+            console.error('fetchImputationStatus failed:', e);
+            setImputationReady(false);
         }
-    }
+    };
 
     const handleRunImputation = async () => {
         if (!target || !maxIteration || !sessionId) return;
@@ -124,8 +144,10 @@ const ImputationConfiguration: React.FC = () => {
 
             console.log('Response:', response);
             setUpdated(!isUpdated);
+            setImputationReady(true); // ✅ imputation now done; reveal Map
         } catch (error: any) {
             console.error(error);
+            setImputationReady(false);
         } finally {
             setLoading(false);
         }
@@ -162,7 +184,7 @@ const ImputationConfiguration: React.FC = () => {
             <Radio.Group
               onChange={(e) => {
                 setType(e.target.value);
-                setTarget(undefined); // Reset selection so the default kicks in for the new mode
+                setTarget(undefined);
               }}
               value={type}
               className={styles.radioGroup}
@@ -204,6 +226,13 @@ const ImputationConfiguration: React.FC = () => {
                         <Button type="primary" onClick={handleRunImputation} loading={loading} disabled={loading}>
                             Run Imputation
                         </Button>
+
+                        {/* ✅ Show Map button only when imputation is done */}
+                        {imputationReady && (
+                            <Button>
+                                <GeoMapModal />
+                            </Button>
+                        )}
                     </div>
 
                     {/* Optional: show a progress bar if you decide to re-enable it */}
@@ -214,7 +243,6 @@ const ImputationConfiguration: React.FC = () => {
             </div>
           )}
           */}
-
                 </div>
             </div>
         </ChartWrapper>

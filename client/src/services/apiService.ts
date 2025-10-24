@@ -256,15 +256,17 @@ export async function fetchPreimputeColumns(params: { use_raw?: boolean } = {}):
   }
 }
 
+
 interface PreimputeScatterParams {
   x_column: string;
   y_column: string;
+  target_column: string;   // NEW required field
   sample_size?: number;
 }
 
 export async function fetchPreimputeScatter(params: PreimputeScatterParams) {
-  if (!params?.x_column || !params?.y_column) {
-    throw new Error('x_column and y_column are required');
+  if (!params?.x_column || !params?.y_column || !params?.target_column) {
+    throw new Error('x_column, y_column, and target_column are required');
   }
   try {
     const response = await axios.get(`${API_BASE_URL}/dataframe/preimpute/scatter`, {
@@ -272,13 +274,13 @@ export async function fetchPreimputeScatter(params: PreimputeScatterParams) {
         session_id: getSessionId(),
         x_column: params.x_column,
         y_column: params.y_column,
+        target_column: params.target_column,  // pass through
         ...(params.sample_size ? { sample_size: params.sample_size } : {}),
       },
     });
     return response.data;
   } catch (error: any) {
     console.error('Error fetching pre-impute scatter:', error?.response?.data ?? error);
-    // Surface backend error details if present
     throw new Error(
       (error?.response?.data && typeof error.response.data === 'string')
         ? error.response.data
@@ -290,7 +292,7 @@ export async function fetchPreimputeScatter(params: PreimputeScatterParams) {
 export interface ScatterPoint {
   x: number;
   y: number;
-  label: string;
+  label?: 'Imputed'|'Rest';
 }
 
 export interface MapDataResponse {
