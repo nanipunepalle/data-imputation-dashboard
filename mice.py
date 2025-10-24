@@ -90,5 +90,5 @@ class MiceImputer:
         original_values_20 = original_series[evaluation_mask]
         imputed_values_20 = self.df[self.cols][evaluation_mask]
 
-        return orig_values, imputed_values_only, combined, combined_mask, original_values_20, imputed_values_20, evaluation_mask
+        return orig_values, imputed_values_only, combined, combined_mask, original_values_20, imputed_values_20, evaluation_mask, {}
 

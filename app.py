@@ -334,6 +334,7 @@ async def impute_api(
         test_orig = cached["test_orig"]
         test_imp = cached["test_imp"]
         test_mask = cached["test_mask"]
+        all_neighbor_map = cached.get("all_neighbor_map", {})
     else:
         if algo == "mice":
             imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
@@ -346,12 +347,24 @@ async def impute_api(
             raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
 
         # Run imputation
-        orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask = (
+        orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask, all_neighbor_map = (
             imputer.impute()
         )
-        combined.to_csv(f"mice_combined.csv", index=False)
-        mask.to_csv(f"mice_mask.csv", index=False)
-        imp_vals.to_csv(f"mice_imputed.csv", index=False)
+        try:
+            fname = f"{session_id}_{algo}_neighbor_map.txt"
+            with open(fname, "w") as fh:
+                json.dump(
+                    all_neighbor_map,
+                    fh,
+                    default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o),
+                    indent=2,
+                )
+            print(f"Wrote neighbor map to {fname}")
+        except Exception as e:
+            print(f"Error writing neighbor map: {e}")
+        # combined.to_csv(f"mice_combined.csv", index=False)
+        # mask.to_csv(f"mice_mask.csv", index=False)
+        # imp_vals.to_csv(f"mice_imputed.csv", index=False)
 
         # Store in cache
         imputation_store[cache_key] = {
@@ -362,6 +375,7 @@ async def impute_api(
             "test_orig": test_orig,
             "test_imp": test_imp,
             "test_mask": test_mask,
+            "all_neighbor_map": all_neighbor_map,
         }
 
     # Save imputed components separately for this session
@@ -373,6 +387,7 @@ async def impute_api(
         "test_orig": test_orig,
         "test_imp": test_imp,
         "test_mask": test_mask,
+        "all_neighbor_map": all_neighbor_map,
     }
 
     return {
