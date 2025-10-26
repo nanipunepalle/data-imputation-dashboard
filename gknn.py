@@ -126,10 +126,10 @@ class gKNNImputer:
         target = self.columns[0]
 
         twenty_imp, twenty_true, twenty_mask = self.run(self.df, target, ['random'], validation=False, real_test=True)
-        orig_values, imp_values, combined, mask = self.run(self.df, target, validation=False, real_test=False)
+        orig_values, imp_values, combined, mask, all_neighbor_map = self.run(self.df, target, validation=False, real_test=False)
         if isinstance(combined, pd.DataFrame) and 'County Code' in combined.columns:
             combined = combined.sort_values('County Code').reset_index(drop=True)
-        return orig_values, imp_values, combined, mask, twenty_true, twenty_imp, twenty_mask
+        return orig_values, imp_values, combined, mask, twenty_true, twenty_imp, twenty_mask, all_neighbor_map
 
     def run(self, df, target, death_threshold=[], interval=False, validation=False,real_test=False, plot=False):
         socio_econ_file_path = self.getSociEconFile()
@@ -234,4 +234,4 @@ class gKNNImputer:
             mask_bool.loc[missing_indices, target] = True
 
         mask_bool = mask_bool.sort_values(by="County Code").reset_index(drop=True)
-        return orig_values.to_frame(), imp_values.to_frame(), combined.to_frame(), mask_bool
+        return orig_values.to_frame(), imp_values.to_frame(), combined.to_frame(), mask_bool, all_neighbor_map
