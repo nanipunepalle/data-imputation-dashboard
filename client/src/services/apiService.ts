@@ -316,3 +316,15 @@ export async function fetchMapData(): Promise<MapDataResponse> {
     throw error;
   }
 }
+
+// --- Neighbor map ------------------------------------------------------------
+export async function fetchNeighborMap() {
+  const res = await fetch(`${API_BASE_URL}/dataframe/neighbor_map?session_id=${getSessionId()}`);
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`Neighbor map fetch failed: ${res.status} ${msg}`);
+  }
+  const data = await res.json();
+  return data.neighbor_map as Record<string, any>;
+}
+
