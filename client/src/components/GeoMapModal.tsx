@@ -1,13 +1,20 @@
-// GeoMapModal.tsx
 "use client";
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Modal, Button, Typography } from 'antd';
+import { Modal, Button, Typography, Card, Tag, List, Space } from 'antd';
 import { useDatasetStore } from '@/store/useDataStore';
 
 const { Text } = Typography;
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
+
+type NeighborInfo = {
+  geoid: string;
+  name: string;
+  state?: string;
+  deaths_per_100k?: number;
+  isImputed: boolean;
+};
 
 const GeoMapModal: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -17,6 +24,9 @@ const GeoMapModal: React.FC = () => {
   const { dataset, isUpdated } = useDatasetStore();
 
   const handleCountyClick = (countyData: any) => setSelectedCounty(countyData);
+
+  const statusTag = (imputed: boolean) =>
+    imputed ? <Tag color="magenta">Imputed</Tag> : <Tag color="green">Observed</Tag>;
 
   return (
     <>
@@ -39,36 +49,75 @@ const GeoMapModal: React.FC = () => {
         />
 
         {selectedCounty && (
-          <div style={{
-            marginTop: 16, padding: 16, background: '#f5f5f5',
-            borderRadius: 4, border: '1px solid #d9d9d9'
-          }}>
-            <div style={{ marginBottom: 8 }}>
-              <Text strong style={{ fontSize: 16 }}>
-                {selectedCounty.county_name || selectedCounty.NAME}
-              </Text>
-              {selectedCounty.state_name && (
-                <Text type="secondary" style={{ marginLeft: 8 }}>
-                  {selectedCounty.state_name}
+          <Card
+            style={{ marginTop: 16 }}
+            title={
+              <Space wrap>
+                <Text strong style={{ fontSize: 16 }}>
+                  {selectedCounty.county_name || selectedCounty.NAME}
                 </Text>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {selectedCounty.state_name && (
+                  <Text type="secondary">({selectedCounty.state_name})</Text>
+                )}
+                {statusTag(!!selectedCounty.isImputed)}
+              </Space>
+            }
+            extra={
+              <Button size="small" onClick={() => setSelectedCounty(null)}>
+                Clear
+              </Button>
+            }
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <Text type="secondary">County Code (GEOID):</Text><br />
                 <Text strong>{selectedCounty.geoid || selectedCounty.GEOID}</Text>
               </div>
-              {selectedCounty.deaths_per_100k !== undefined && (
-                <div>
-                  <Text type="secondary">Deaths per 100k:</Text><br />
-                  <Text strong style={{ color: '#cf1322', fontSize: 18 }}>
-                    {selectedCounty.deaths_per_100k.toFixed(2)}
-                  </Text>
-                </div>
-              )}
+              <div>
+                <Text type="secondary">Deaths per 100k:</Text><br />
+                <Text strong style={{ color: '#cf1322' }}>
+                  {selectedCounty.deaths_per_100k !== undefined
+                    ? Number(selectedCounty.deaths_per_100k).toFixed(2)
+                    : '—'}
+                </Text>
+              </div>
             </div>
-          </div>
+
+            {/* NEW: Neighbor list */}
+            <div style={{ marginTop: 4 }}>
+              <Text strong>Neighboring Counties</Text>
+              <List
+                style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto' }}
+                size="small"
+                bordered
+                dataSource={(selectedCounty.neighbors as NeighborInfo[]) ?? []}
+                locale={{ emptyText: 'No neighbors found' }}
+                renderItem={(item) => (
+                  <List.Item>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr auto', gap: 8, width: '100%' }}>
+                      <div>
+                        <div>
+                          <Text>{item.name}</Text>{' '}
+                          {item.state && <Text type="secondary">({item.state})</Text>}
+                        </div>
+                        <div>
+                          <Text type="secondary">GEOID: </Text>
+                          <Text code>{item.geoid}</Text>
+                        </div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Deaths per 100k:</Text><br />
+                        <Text strong>{item.deaths_per_100k !== undefined ? item.deaths_per_100k.toFixed(2) : '—'}</Text>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        {statusTag(item.isImputed)}
+                      </div>
+                    </div>
+                  </List.Item>
+                )}
+              />
+            </div>
+          </Card>
         )}
       </Modal>
     </>

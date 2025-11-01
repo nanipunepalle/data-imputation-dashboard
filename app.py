@@ -550,6 +550,21 @@ def get_scatter_plot_data(
         "points": points
     }
 
+@app.get("/dataframe/neighbor_map")
+def get_neighbor_map(session_id: str = Query(...)):
+    """
+    Return the raw neighbor map dictionary for a given session.
+    """
+    if session_id not in imputation_store:
+        raise HTTPException(status_code=400, detail="No imputation data for this session.")
+
+    neighbor_map = imputation_store[session_id].get("all_neighbor_map")
+    if neighbor_map is None:
+        raise HTTPException(status_code=404, detail="Neighbor map not found for this session.")
+
+    return {"neighbor_map": neighbor_map}
+
+
 
 @app.get("/dataframe/preimpute/columns")
 def get_preimpute_numeric_like_columns(
