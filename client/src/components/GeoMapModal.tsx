@@ -30,7 +30,7 @@ const GeoMapModal: React.FC = () => {
 
   return (
     <>
-      <Button type="link" onClick={() => setOpen(true)}>🌍 Map</Button>
+      <Button type="link" onClick={() => setOpen(true)}>Map</Button>
       <Modal
         title="U.S. Counties - Deaths per 100k Population"
         open={open}
@@ -39,13 +39,25 @@ const GeoMapModal: React.FC = () => {
           setSelectedCounty(null);
         }}
         footer={null}
-        width={1100}
+  // make modal wider so the map can occupy more of the screen
+  width={'90vw'}
+  // `bodyStyle` is deprecated in antd v5; use the `styles` API instead
+  // to target the modal body element.
+  styles={{ body: { padding: '12px 12px 18px 12px' } }}
         destroyOnClose   // ✅ ensure unmount on close
       >
         {/* ✅ force a fresh mount when dataset or isUpdated flips */}
         <MapView
-          key={`${String(dataset)}::${String(isUpdated)}`}
+          // only remount when `isUpdated` changes — avoid remounts when the
+          // modal's local selection changes (which previously triggered a
+          // remount and re-loading of the geo data)
+          key={String(isUpdated)}
           onCountyClick={handleCountyClick}
+          // disable hover effects when a county is selected in the modal
+          hoverEnabled={selectedCounty === null}
+          // controlled selection: instruct the map which GEOID is selected so
+          // contributors remain highlighted until the Clear button is pressed
+          selectedGeoid={selectedCounty?.geoid ?? selectedCounty?.GEOID ?? null}
         />
 
         {selectedCounty && (

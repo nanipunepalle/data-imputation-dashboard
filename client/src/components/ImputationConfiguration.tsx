@@ -229,9 +229,40 @@ const ImputationConfiguration: React.FC = () => {
 
                         {/* ✅ Show Map button only when imputation is done */}
                         {imputationReady && (
-                            <Button>
-                                <GeoMapModal />
-                            </Button>
+                            <>
+                                <Button>
+                                    <GeoMapModal />
+                                </Button>
+                                <Button 
+                                    type="default" 
+                                    onClick={async () => {
+                                        const sessionId = localStorage.getItem('session_id');
+                                        if (!sessionId) {
+                                            console.error('No session ID found');
+                                            return;
+                                        }
+                                        try {
+                                            const response = await fetch(`http://localhost:8000/dataframe/download_imputed_csv?session_id=${sessionId}`);
+                                            if (!response.ok) {
+                                                throw new Error('Failed to download CSV');
+                                            }
+                                            const blob = await response.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `imputed_data_${sessionId}.csv`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            a.remove();
+                                            window.URL.revokeObjectURL(url);
+                                        } catch (error) {
+                                            console.error('Error downloading CSV:', error);
+                                        }
+                                    }}
+                                >
+                                    Download CSV
+                                </Button>
+                            </>
                         )}
                     </div>
 

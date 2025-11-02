@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { Checkbox } from 'antd';
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import { fetchMapData, ScatterPoint } from '@/services/apiService';
 import { fetchNeighborMap } from '@/services/apiService'; // <-- NEW
@@ -8,6 +9,12 @@ import { useDatasetStore } from '@/store/useDataStore';
 
 interface MapViewProps {
   onCountyClick?: (county: any) => void;
+  // control whether hover interactions are enabled; parent (modal) can
+  // disable hover when a county has been clicked for details.
+  hoverEnabled?: boolean;
+  // optional controlled selected GEOID from parent so contributors remain
+  // highlighted until the parent clears selection.
+  selectedGeoid?: string | null;
 }
 
 const padFips = (v: any) => String(v ?? "").replace(/\D/g, "").padStart(5, "0");
@@ -35,7 +42,7 @@ type FeatureIndexVal = {
   GEOID?: string;
 };
 
-const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
+const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, selectedGeoid = null }) => {
   const { dataset, isUpdated } = useDatasetStore();
   const [geoData, setGeoData] = useState<any>(null);
   const [mapData, setMapData] = useState<Map<string, number>>(new Map());
@@ -43,10 +50,45 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
   const [error, setError] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
   const [imputedSet, setImputedSet] = useState<Set<string>>(new Set());
+  const [showImputed, setShowImputed] = useState<boolean>(true);
+  const [showObserved, setShowObserved] = useState<boolean>(true);
+
+  // counts for legend checkboxes
+  const imputedCount = useMemo(() => {
+    let c = 0;
+    mapData.forEach((_, k) => { if (imputedSet.has(k)) c++; });
+    return c;
+  }, [mapData, imputedSet]);
+
+  const observedCount = useMemo(() => {
+    return Math.max(0, mapData.size - imputedCount);
+  }, [mapData, imputedCount]);
 
   // NEW: neighbor map (GEOID -> Set<GEOID>)
   const [neighborMap, setNeighborMap] = useState<Map<string, Set<string>>>(new Map());
   const [hoveredGeoid, setHoveredGeoid] = useState<string | null>(null);
+  // UI states for legend: collapsed vs expanded, and side position
+  const [legendCollapsed, setLegendCollapsed] = useState<boolean>(false);
+  const [legendPosition, setLegendPosition] = useState<'right' | 'left'>('right');
+
+  // Compute contributors early (hooks must run in the same order every render).
+  // These do not depend on geoData, so compute before any early returns.
+  const selectedContributorsEarly = (selectedGeoid && imputedSet.has(selectedGeoid)) ? (neighborMap.get(selectedGeoid) ?? new Set<string>()) : new Set<string>();
+  const hoverContributorsEarly = (hoveredGeoid && imputedSet.has(hoveredGeoid)) ? (neighborMap.get(hoveredGeoid) ?? new Set<string>()) : new Set<string>();
+
+  const activeContributorsEarly = useMemo(() => {
+    const s = new Set<string>();
+    hoverContributorsEarly.forEach(id => s.add(id));
+    selectedContributorsEarly.forEach(id => s.add(id));
+    return s;
+  }, [hoverContributorsEarly, selectedContributorsEarly, neighborMap]);
+
+  // Also keep the generic neighbor set for hover/outline logic
+  // Use the hovered GEOID if present, otherwise fall back to the controlled
+  // `selectedGeoid` so neighbors are highlighted while a county is selected
+  // (hover may be disabled by the parent while a county is selected).
+  const focusGeoid = hoveredGeoid ?? selectedGeoid ?? null;
+  const neighborsOfHoverEarly = focusGeoid ? (neighborMap.get(focusGeoid) ?? new Set<string>()) : new Set<string>();
 
   useEffect(() => {
     setLoading(true);
@@ -127,7 +169,7 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
     if (deathRate < 15) return '#fd8d3c';
     if (deathRate < 20) return '#fc4e2a';
     if (deathRate < 25) return '#e31a1c';
-    return '#bd0026';
+    return '#800026';
   };
 
   const getCountyData = (geoid: string) => {
@@ -160,12 +202,15 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
 
   if (!geoData) return <div style={{ padding: 20, textAlign: 'center' }}>No map data available</div>;
 
-  // For hover styling
-  const neighborsOfHover = hoveredGeoid ? (neighborMap.get(hoveredGeoid) ?? new Set()) : new Set<string>();
+  // For hover/selection styling - use the early computed values (see above).
+  const activeContributors = activeContributorsEarly;
+  // neighborsOfHover now refers to the neighbors of the current focus
+  // (either hovered geoid or selected geoid).
+  const neighborsOfHover = neighborsOfHoverEarly;
 
   return (
-    <div style={{ width: '100%', height: '60vh', overflow: 'hidden', position: 'relative' }}>
-      <ComposableMap projection="geoAlbersUsa" projectionConfig={{ scale: 1000 }} style={{ width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '84vh', overflow: 'hidden', position: 'relative' }}>
+  <ComposableMap projection="geoAlbersUsa" projectionConfig={{ scale: 1200 }} style={{ width: '100%', height: '100%' }}>
         <Geographies geography={geoData}>
           {({ geographies }) =>
             geographies.map((geo) => {
@@ -175,17 +220,37 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
 
               const isHovered = hoveredGeoid === geoid;
               const isNeighbor = neighborsOfHover.has(geoid);
-              const baseStroke = !isImputed ? '#a0d468' : '#ffffff';
-              const hoverStroke = !isImputed ? '#7ac142' : '#ffffff';
+              const isContributor = activeContributors.has(geoid);
+              // Use neutral strokes for all counties (remove green/blue borders)
+              const baseStroke = '#ffffff';
+              const hoverStroke = '#722ed1';
+
+              // Determine visibility based on imputed/observed checkboxes
+              // Also keep contributors visible even when observed are unchecked
+              // and keep the selected county visible regardless of filters.
+              const visible = (isImputed && showImputed) || (!isImputed && showObserved) || isContributor || (geoid === selectedGeoid);
 
               // NEW: outline logic
               let stroke = baseStroke;
               let strokeWidth = 0.5;
 
+              // If this county is a neighbor of the focused county (hovered
+              // or selected), outline it in blue so neighbors stand out.
               if (isNeighbor) {
-                stroke = '#1890ff';      // neighbor highlight
+                stroke = '#1890ff';
                 strokeWidth = 1.5;
               }
+
+              // If this county is a contributor (selected or hovered
+              // contributor), use a slightly darker blue outline to make
+              // them distinct (and keep the blue fill as before).
+              if (isContributor) {
+                stroke = '#0958d9';
+                strokeWidth = Math.max(strokeWidth, 1);
+              }
+
+              // Hovered county gets a prominent purple outline (overrides
+              // neighbour/contributor outlines for the hovered county itself).
               if (isHovered) {
                 stroke = '#722ed1';      // hovered county highlight
                 strokeWidth = 2;
@@ -196,11 +261,18 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
                   key={geo.rsmKey}
                   geography={geo}
                   onMouseEnter={(event) => {
+                    // If parent has disabled hover (e.g., a county is selected
+                    // and the modal is showing details), skip hover handling.
+                    if (!visible || !hoverEnabled) return;
                     const props = geo.properties || {};
                     const countyName = props.NAME || props.county_name || 'Unknown County';
                     const deathRate = mapData.get(geoid);
 
-                    setHoveredGeoid(geoid); // <-- NEW
+            // only set hoveredGeoid if hoverEnabled prop is true
+            // (read from component props via closure)
+            // We'll get hoverEnabled via the prop in scope below.
+                    
+            setHoveredGeoid(geoid); // <-- NEW
 
                     let tooltipContent = `${countyName}`;
                     if (deathRate !== undefined) {
@@ -217,13 +289,48 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
                     setTooltip({ x: event.clientX, y: event.clientY, content: tooltipContent });
                   }}
                   onMouseMove={(event) => {
+                    // If hover is disabled or county not visible, ensure tooltip
+                    // is cleared and do nothing.
+                    if (!visible || !hoverEnabled) {
+                      setTooltip(null);
+                      setHoveredGeoid(null);
+                      return;
+                    }
+
+                    // If the cursor moved over a new geography but onMouseEnter
+                    // didn't fire for some reason, update hoveredGeoid and
+                    // tooltip content here so continuous movement updates the
+                    // details reliably.
+                    if (hoveredGeoid !== geoid) {
+                      setHoveredGeoid(geoid);
+
+                      const props = geo.properties || {};
+                      const countyName = props.NAME || props.county_name || 'Unknown County';
+                      const deathRate = mapData.get(geoid);
+                      let tooltipContent = `${countyName}`;
+                      if (deathRate !== undefined) {
+                        tooltipContent += `\nDeaths per 100k: ${deathRate.toFixed(2)}`;
+                      } else {
+                        tooltipContent += `\nNo data available`;
+                      }
+                      tooltipContent += `\nStatus: ${isImputed ? 'Imputed' : 'Observed'}`;
+                      const nCount = neighborMap.get(geoid)?.size ?? 0;
+                      if (nCount > 0) tooltipContent += `\nNeighbors: ${nCount}`;
+
+                      setTooltip({ x: event.clientX, y: event.clientY, content: tooltipContent });
+                      return;
+                    }
+
+                    // Otherwise, just update coordinates so tooltip follows the cursor.
                     if (tooltip) setTooltip({ ...tooltip, x: event.clientX, y: event.clientY });
                   }}
                   onMouseLeave={() => {
+                    if (!visible || !hoverEnabled) return;
                     setTooltip(null);
                     setHoveredGeoid(null); // <-- NEW
                   }}
-                  onClick={() => {
+                    onClick={() => {
+                    if (!visible) return;
                     if (!onCountyClick) return;
 
                     // Build neighbors payload with names + stats
@@ -256,18 +363,34 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
                   }}
                   style={{
                     default: {
-                      fill: getCountyColor(geoid),
-                      stroke,
-                      strokeWidth,
+                      // If this county is the currently selected county, persist the
+                      // hover color (green) so selection remains visible after
+                      // moving the mouse away. Contributors remain blue.
+                      fill: geoid === selectedGeoid ? '#52c41a' : (isContributor ? '#1890ff' : getCountyColor(geoid)),
+                      opacity: visible ? 1 : 0.15,
+                      stroke: visible ? stroke : '#e6e6e6',
+                      strokeWidth: visible ? strokeWidth : 0.5,
                       outline: 'none',
+                      cursor: visible ? 'pointer' : 'default',
                     },
-                    hover: {
-                      fill: '#F53',
-                      stroke: isNeighbor ? '#1890ff' : hoverStroke,
-                      strokeWidth: isNeighbor ? 1.5 : 0.75,
-                      outline: 'none',
-                      cursor: 'pointer',
-                    },
+                    hover: visible
+                      ? {
+                          // Use green for hover so it doesn't conflict with
+                          // the choropleth red colors in the legend.
+                          fill: '#52c41a',
+                          stroke: hoverStroke,
+                          strokeWidth: isNeighbor ? 1.5 : 0.75,
+                          outline: 'none',
+                          cursor: 'pointer',
+                        }
+                      : {
+                          fill: getCountyColor(geoid),
+                          opacity: 0.15,
+                          stroke: '#e6e6e6',
+                          strokeWidth: 0.5,
+                          outline: 'none',
+                          cursor: 'default',
+                        },
                     pressed: {
                       fill: '#E42',
                       stroke,
@@ -305,34 +428,108 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick }) => {
       )}
 
       {/* Legend (adds hover annotations) */}
-      <div style={{
-        position: 'absolute',
-        bottom: 20,
-        right: 20,
-        background: 'white',
-        padding: 12,
-        borderRadius: 4,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        fontSize: 12
-      }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Deaths per 100k</div>
-        {/* ... your existing color items ... */}
-        <div style={{ marginTop: 8, borderTop: '1px solid #eee', paddingTop: 8 }}>
-          <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Annotations</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 20, height: 12, background: '#ffffff', border: '2px solid #52c41a', boxSizing: 'border-box' }} />
-            <span>Observed</span>
+      {/* Floating control to collapse/expand legend and move its side */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 14,
+          right: legendPosition === 'right' ? 18 : 'auto',
+          left: legendPosition === 'left' ? 18 : 'auto',
+          zIndex: 1050,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+        }}
+      >
+        <button
+          onClick={() => setLegendCollapsed(prev => !prev)}
+          aria-label={legendCollapsed ? 'Expand legend' : 'Collapse legend'}
+          style={{
+            background: 'rgba(255,255,255,0.9)',
+            border: '1px solid rgba(0,0,0,0.08)',
+            padding: '6px 8px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+          }}
+        >
+          {legendCollapsed ? '▸ Legend' : '◂ Legend'}
+        </button>
+        <button
+          onClick={() => setLegendPosition(pos => pos === 'right' ? 'left' : 'right')}
+          title="Move legend"
+          style={{
+            background: 'rgba(255,255,255,0.85)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            padding: '6px 8px',
+            borderRadius: 6,
+            cursor: 'pointer'
+          }}
+        >
+          {legendPosition === 'right' ? 'Move Left' : 'Move Right'}
+        </button>
+      </div>
+
+      {!legendCollapsed && (
+        <div style={{
+          position: 'absolute',
+          bottom: 18,
+          right: legendPosition === 'right' ? 18 : 'auto',
+          left: legendPosition === 'left' ? 18 : 'auto',
+          background: 'white',
+          padding: 8,
+          borderRadius: 6,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          fontSize: 11,
+          width: 160,
+          maxWidth: '30%',
+          transition: 'opacity 120ms ease'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Deaths per 100k</div>
+
+          {/* Checkbox filters for Imputed / Observed */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6, fontSize: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Checkbox checked={showImputed} onChange={(e) => setShowImputed(e.target.checked)} />
+              <span style={{ fontSize: 12 }}>Imputed ({imputedCount})</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Checkbox checked={showObserved} onChange={(e) => setShowObserved(e.target.checked)} />
+              <span style={{ fontSize: 12 }}>Observed ({observedCount})</span>
+            </label>
           </div>
-          {/* <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <div style={{ width: 20, height: 12, background: '#ffffff', border: '2px solid #722ed1', boxSizing: 'border-box' }} />
-            <span>Hovered county</span>
-          </div> */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <div style={{ width: 20, height: 12, background: '#ffffff', border: '2px solid #1890ff', boxSizing: 'border-box' }} />
-            <span>Neighbor Counties</span>
+
+          {/* Legend swatches matching the choropleth bins */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[
+              ['#ffffcc', '< 1'],
+              ['#ffeda0', '1-3'],
+              ['#fed976', '3-5'],
+              ['#feb24c', '5-10'],
+              ['#fd8d3c', '10-15'],
+              ['#fc4e2a', '15-20'],
+              ['#e31a1c', '20-25'],
+              ['#800026', '25+'],
+            ].map(([color, label]) => (
+              <div key={String(label)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 16, height: 10, background: String(color) }} />
+                <span style={{ fontSize: 11 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, borderTop: '1px solid #eee', paddingTop: 8 }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Annotations</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{ width: 16, height: 10, background: '#52c41a', boxSizing: 'border-box' }} />
+              <span style={{ fontSize: 11 }}>Imputed</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{ width: 16, height: 10, background: '#1890ff', boxSizing: 'border-box' }} />
+              <span style={{ fontSize: 11 }}>Contributors</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
