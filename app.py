@@ -23,6 +23,7 @@ from customLabelEncoder import CustomLabelEncoder
 from featureImportance import FeatureImportance
 
 from typing import Optional
+import base64
 
 app = FastAPI()
 
@@ -347,7 +348,7 @@ async def impute_api(
             raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
 
         # Run imputation
-        orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask, all_neighbor_map = (
+        orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask, downloadable_csv, all_neighbor_map = (
             imputer.impute()
         )
         try:
@@ -388,6 +389,7 @@ async def impute_api(
         "test_imp": test_imp,
         "test_mask": test_mask,
         "all_neighbor_map": all_neighbor_map,
+        "downloadable_csv": downloadable_csv,
     }
 
     return {
