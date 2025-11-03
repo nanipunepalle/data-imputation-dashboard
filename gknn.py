@@ -126,10 +126,38 @@ class gKNNImputer:
         target = self.columns[0]
 
         twenty_imp, twenty_true, twenty_mask = self.run(self.df, target, ['random'], validation=False, real_test=True)
-        orig_values, imp_values, combined, mask, all_neighbor_map = self.run(self.df, target, validation=False, real_test=False)
+        orig_values, imp_values, combined, mask, all_neighbor_map, final_cdc_data_copy = self.run(self.df, target, validation=False, real_test=False)
         if isinstance(combined, pd.DataFrame) and 'County Code' in combined.columns:
             combined = combined.sort_values('County Code').reset_index(drop=True)
-        return orig_values, imp_values, combined, mask, twenty_true, twenty_imp, twenty_mask, all_neighbor_map
+        
+        # Create CSV combining original df with imputed values
+        # Sort the original dataframe by County Code to match the sorted imputed data
+        combined_df = final_cdc_data_copy.copy()
+        combined_df['County Code'] = combined_df['County Code'].apply(lambda x: str(int(x)) if not pd.isna(x) else x).str.zfill(5)
+        combined_df = combined_df.sort_values('County Code').reset_index(drop=True)
+        
+        # combined is already sorted by County Code and doesn't have County Code as a column
+        if isinstance(combined, pd.DataFrame):
+            combined_for_merge = combined.copy()
+        else:
+            combined_for_merge = combined.to_frame()
+        
+        # Rename the target column to indicate it contains imputed values
+        if target in combined_for_merge.columns:
+            combined_for_merge = combined_for_merge.rename(columns={target: f'{target}_imputed'})
+        
+        # Directly concatenate since both are sorted by County Code
+        combined_df[f'{target}_imputed'] = combined_for_merge[f'{target}_imputed'].values
+        
+        # Create a final column that uses imputed values where original was missing
+        combined_df[f'{target}_final'] = combined_df[target].fillna(combined_df[f'{target}_imputed'])
+        
+        # Generate CSV string and bytes
+        self.imputed_csv = combined_df.to_csv(index=False)
+        self.imputed_csv_bytes = self.imputed_csv.encode('utf-8')
+        
+        # Return the existing outputs plus the CSV variables in the final dict
+        return orig_values, imp_values, combined, mask, twenty_true, twenty_imp, twenty_mask, self.imputed_csv, all_neighbor_map
 
     def run(self, df, target, death_threshold=[], interval=False, validation=False,real_test=False, plot=False):
         socio_econ_file_path = self.getSociEconFile()
@@ -153,6 +181,7 @@ class gKNNImputer:
         geoid_to_index = {geoid: idx for idx, geoid in enumerate(df_socio_econ['GEOID'])}
         final_cdc_data['Socio_Index'] = final_cdc_data['County Code'].map(geoid_to_index)
         final_cdc_data = final_cdc_data[final_cdc_data['Socio_Index'].notna()].copy()
+        final_cdc_data_copy = final_cdc_data.copy()
 
         if real_test:
             final_cdc_data = final_cdc_data[final_cdc_data[target].notna()].copy()
@@ -234,4 +263,4 @@ class gKNNImputer:
             mask_bool.loc[missing_indices, target] = True
 
         mask_bool = mask_bool.sort_values(by="County Code").reset_index(drop=True)
-        return orig_values.to_frame(), imp_values.to_frame(), combined.to_frame(), mask_bool, all_neighbor_map
+        return orig_values.to_frame(), imp_values.to_frame(), combined.to_frame(), mask_bool, all_neighbor_map, final_cdc_data_copy

@@ -2,6 +2,7 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 import numpy as np
 import pandas as pd
+import io
 from customLabelEncoder import CustomLabelEncoder
 
 
@@ -13,6 +14,9 @@ class MiceImputer:
         self.random_state = random_state
         self.label_encoders = {}  # Store encoders for each non-numeric column
         self.treat_none_as_category = treat_none_as_category
+        # new variables to hold CSV output
+        self.imputed_csv = None
+        self.imputed_csv_bytes = None
 
     def encode_categoricals(self):
         """
@@ -29,7 +33,8 @@ class MiceImputer:
         """
         Imputes missing values using MICE across specified columns.
         Also masks 20% of existing non-null values in target columns for evaluation,
-        and returns both full and evaluation-specific results.
+        and returns both full and evaluation-specific results. Also creates a CSV
+        representation of the imputed dataframe (in-memory) and stores it on the instance.
         """
         if not isinstance(self.cols, list):
             raise ValueError("The 'cols' parameter must be a list of column names.")
@@ -68,10 +73,10 @@ class MiceImputer:
         for col in self.cols:
             non_null_indices = self.df[self.df[col].notna()].index
             sample_size = int(0.2 * len(non_null_indices))
-            sample_indices = np.random.choice(non_null_indices, size=sample_size, replace=False)
-            evaluation_mask.loc[sample_indices, col] = True
-            self.df.loc[sample_indices, col] = np.nan  # Mask for evaluation
-
+            if sample_size > 0:
+                sample_indices = np.random.choice(non_null_indices, size=sample_size, replace=False)
+                evaluation_mask.loc[sample_indices, col] = True
+                self.df.loc[sample_indices, col] = np.nan  # Mask for evaluation
 
         # Impute using IterativeImputer
         imputer = IterativeImputer(max_iter=self.max_iter, random_state=self.random_state)
@@ -80,6 +85,13 @@ class MiceImputer:
         # Update self.df with imputed values
         imputed_array = pd.DataFrame(imputed_values, columns=numerical_cols, index=self.df.index)
         self.df[numerical_cols] = imputed_array[numerical_cols]
+
+        # After merging imputed columns into self.df, create CSV (in-memory) for download
+        merged_df = self.df.copy()
+        # CSV as string
+        self.imputed_csv = merged_df.to_csv(index=False)
+        # CSV as bytes buffer (useful for sending as downloadable file in web frameworks)
+        self.imputed_csv_bytes = io.BytesIO(self.imputed_csv.encode('utf-8'))
 
         # Extract original and imputed values for:
         orig_values = original_series.dropna()
@@ -90,5 +102,5 @@ class MiceImputer:
         original_values_20 = original_series[evaluation_mask]
         imputed_values_20 = self.df[self.cols][evaluation_mask]
 
-        return orig_values, imputed_values_only, combined, combined_mask, original_values_20, imputed_values_20, evaluation_mask, {}
-
+        # Return the existing outputs plus the CSV variables in the final dict
+        return orig_values, imputed_values_only, combined, combined_mask, original_values_20, imputed_values_20, evaluation_mask, self.imputed_csv, {}
