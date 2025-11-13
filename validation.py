@@ -93,9 +93,9 @@ def validate_imputation_kfold(cdc_data, distance_matrix, target, k=5, n_splits=5
     avg_corr = np.mean(corr_list) if corr_list else np.nan
     
     metrics = {
-        'MAE': avg_mae,
-        'MSE': avg_mse,
-        'RMSE': avg_rmse,
+        'MAE': avg_mae, # include
+        'MSE': avg_mse, 
+        'RMSE': avg_rmse, # include
         'NRMSE': avg_nrmse,
         'Correlation': avg_corr
     }

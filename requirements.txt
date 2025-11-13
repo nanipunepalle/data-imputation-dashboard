@@ -4,6 +4,7 @@ pandas
 numpy
 scikit-learn
 python-multipart
+missingpy
 seaborn
 pymc_bart
 pymc

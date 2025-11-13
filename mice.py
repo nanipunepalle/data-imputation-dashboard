@@ -1,5 +1,6 @@
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
 import pandas as pd
 import io
@@ -102,5 +103,35 @@ class MiceImputer:
         original_values_20 = original_series[evaluation_mask]
         imputed_values_20 = self.df[self.cols][evaluation_mask]
 
-        # Return the existing outputs plus the CSV variables in the final dict
+        # Calculate MAE and RMSE for the 20% test data
+        evaluation_metrics = {}
+        for col in self.cols:
+            col_mask = evaluation_mask[col]
+            if col_mask.sum() > 0:  # Only calculate if there are masked values
+                original_col = original_series.loc[col_mask, col].dropna()
+                imputed_col = self.df.loc[col_mask, col].dropna()
+                
+                # Align indices to ensure we're comparing the same values
+                common_idx = original_col.index.intersection(imputed_col.index)
+                if len(common_idx) > 0:
+                    orig_vals = original_col.loc[common_idx].values
+                    imp_vals = imputed_col.loc[common_idx].values
+                    
+                    mae = mean_absolute_error(orig_vals, imp_vals)
+                    mse = mean_squared_error(orig_vals, imp_vals)
+                    rmse = np.sqrt(mse)
+                    
+                    evaluation_metrics[col] = {
+                        'MAE': float(mae),
+                        'RMSE': float(rmse),
+                        'MSE': float(mse),
+                        'n_samples': len(common_idx)
+                    }
+                    
+                    print(f"\n20% Test Evaluation Metrics for '{col}':")
+                    print(f"  Number of test samples: {len(common_idx)}")
+                    print(f"  MAE:  {mae:.4f}")
+                    print(f"  RMSE: {rmse:.4f}")
+                    print(f"  MSE:  {mse:.4f}")
+
         return orig_values, imputed_values_only, combined, combined_mask, original_values_20, imputed_values_20, evaluation_mask, self.imputed_csv, {}
