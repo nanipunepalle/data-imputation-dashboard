@@ -525,7 +525,7 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <div style={{ width: 16, height: 10, background: '#1890ff', boxSizing: 'border-box' }} />
-              <span style={{ fontSize: 11 }}>Contributors</span>
+              <span style={{ fontSize: 11 }}>Donors</span>
             </div>
           </div>
         </div>
