@@ -191,6 +191,8 @@ export interface TestEvaluationResponse {
     mean_abs_diff: number;
     median_abs_diff: number;
     std_abs_diff: number;
+    mae: number;
+    rmse: number; 
   };
 }
 
