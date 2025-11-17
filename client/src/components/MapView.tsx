@@ -91,6 +91,13 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
   const neighborsOfHoverEarly = focusGeoid ? (neighborMap.get(focusGeoid) ?? new Set<string>()) : new Set<string>();
 
   useEffect(() => {
+    if (!hoverEnabled) {
+      setHoveredGeoid(null);
+    }
+  }, [hoverEnabled]);
+
+
+  useEffect(() => {
     setLoading(true);
 
     Promise.all([
@@ -210,7 +217,7 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
 
   return (
     <div style={{ width: '100%', height: '84vh', overflow: 'hidden', position: 'relative' }}>
-  <ComposableMap projection="geoAlbersUsa" projectionConfig={{ scale: 1200 }} style={{ width: '100%', height: '100%' }}>
+      <ComposableMap projection="geoAlbersUsa" projectionConfig={{ scale: 1200 }} style={{ width: '100%', height: '100%' }}>
         <Geographies geography={geoData}>
           {({ geographies }) =>
             geographies.map((geo) => {
@@ -218,7 +225,7 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
               const countyData = getCountyData(geoid);
               const isImputed = imputedSet.has(geoid);
 
-              const isHovered = hoveredGeoid === geoid;
+              const isHovered = hoverEnabled && hoveredGeoid === geoid;
               const isNeighbor = neighborsOfHover.has(geoid);
               const isContributor = activeContributors.has(geoid);
               // Use neutral strokes for all counties (remove green/blue borders)
@@ -261,18 +268,18 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
                   key={geo.rsmKey}
                   geography={geo}
                   onMouseEnter={(event) => {
-                    // If parent has disabled hover (e.g., a county is selected
-                    // and the modal is showing details), skip hover handling.
-                    if (!visible || !hoverEnabled) return;
+                    // Only block if county is invisible; allow tooltip even when hover is disabled.
+                    if (!visible) return;
+
                     const props = geo.properties || {};
                     const countyName = props.NAME || props.county_name || 'Unknown County';
                     const deathRate = mapData.get(geoid);
 
-            // only set hoveredGeoid if hoverEnabled prop is true
-            // (read from component props via closure)
-            // We'll get hoverEnabled via the prop in scope below.
-                    
-            setHoveredGeoid(geoid); // <-- NEW
+                    // Only update hoveredGeoid (which affects neighbor highlighting)
+                    // when hoverEnabled is true.
+                    if (hoverEnabled) {
+                      setHoveredGeoid(geoid);
+                    }
 
                     let tooltipContent = `${countyName}`;
                     if (deathRate !== undefined) {
@@ -282,25 +289,29 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
                     }
                     tooltipContent += `\nStatus: ${isImputed ? 'Imputed' : 'Observed'}`;
 
-                    // optional: show neighbor count if available
                     const nCount = neighborMap.get(geoid)?.size ?? 0;
                     if (nCount > 0) tooltipContent += `\nNeighbors: ${nCount}`;
 
                     setTooltip({ x: event.clientX, y: event.clientY, content: tooltipContent });
                   }}
                   onMouseMove={(event) => {
-                    // If hover is disabled or county not visible, ensure tooltip
-                    // is cleared and do nothing.
-                    if (!visible || !hoverEnabled) {
+                    // If county is not visible, clear tooltip and (optionally) hover state.
+                    if (!visible) {
                       setTooltip(null);
-                      setHoveredGeoid(null);
+                      if (hoverEnabled) setHoveredGeoid(null);
                       return;
                     }
 
-                    // If the cursor moved over a new geography but onMouseEnter
-                    // didn't fire for some reason, update hoveredGeoid and
-                    // tooltip content here so continuous movement updates the
-                    // details reliably.
+                    // If hover is disabled, don't change contributors / neighbors,
+                    // but keep tooltip following the mouse.
+                    if (!hoverEnabled) {
+                      if (tooltip) {
+                        setTooltip({ ...tooltip, x: event.clientX, y: event.clientY });
+                      }
+                      return;
+                    }
+
+                    // Normal behavior when hoverEnabled === true
                     if (hoveredGeoid !== geoid) {
                       setHoveredGeoid(geoid);
 
@@ -321,17 +332,24 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
                       return;
                     }
 
-                    // Otherwise, just update coordinates so tooltip follows the cursor.
+                    // Same geo, just move tooltip with cursor
                     if (tooltip) setTooltip({ ...tooltip, x: event.clientX, y: event.clientY });
                   }}
                   onMouseLeave={() => {
-                    if (!visible || !hoverEnabled) return;
+                    // Only care about visibility; tooltip should clear regardless of hoverEnabled.
+                    if (!visible) return;
                     setTooltip(null);
-                    setHoveredGeoid(null); // <-- NEW
+                    // But only clear hoveredGeoid (which impacts neighbor highlighting)
+                    // when hoverEnabled is true.
+                    // if (hoverEnabled) {
+                      setHoveredGeoid(null);
+                    // }
                   }}
-                    onClick={() => {
+                  onClick={() => {
                     if (!visible) return;
                     if (!onCountyClick) return;
+
+                    setHoveredGeoid(null);
 
                     // Build neighbors payload with names + stats
                     const nbrIds = Array.from(neighborMap.get(geoid) ?? []);
@@ -375,22 +393,22 @@ const MapView: React.FC<MapViewProps> = ({ onCountyClick, hoverEnabled = true, s
                     },
                     hover: visible
                       ? {
-                          // Use green for hover so it doesn't conflict with
-                          // the choropleth red colors in the legend.
-                          fill: '#52c41a',
-                          stroke: hoverStroke,
-                          strokeWidth: isNeighbor ? 1.5 : 0.75,
-                          outline: 'none',
-                          cursor: 'pointer',
-                        }
+                        // Use green for hover so it doesn't conflict with
+                        // the choropleth red colors in the legend.
+                        fill: '#52c41a',
+                        stroke: hoverStroke,
+                        strokeWidth: isNeighbor ? 1.5 : 0.75,
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }
                       : {
-                          fill: getCountyColor(geoid),
-                          opacity: 0.15,
-                          stroke: '#e6e6e6',
-                          strokeWidth: 0.5,
-                          outline: 'none',
-                          cursor: 'default',
-                        },
+                        fill: getCountyColor(geoid),
+                        opacity: 0.15,
+                        stroke: '#e6e6e6',
+                        strokeWidth: 0.5,
+                        outline: 'none',
+                        cursor: 'default',
+                      },
                     pressed: {
                       fill: '#E42',
                       stroke,
