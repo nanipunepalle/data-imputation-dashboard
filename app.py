@@ -328,29 +328,39 @@ async def impute_api(
         cached = imputation_store[cache_key]
         orig_vals = cached["original"]
         imp_vals = cached["imputed"]
-        print("Aitik: Using cached imputation result")
-        imp_vals.to_csv(f"{algo}_imputed.csv", index=False)
         combined = cached["combined"]
         mask = cached["mask"]
         test_orig = cached["test_orig"]
         test_imp = cached["test_imp"]
         test_mask = cached["test_mask"]
         all_neighbor_map = cached.get("all_neighbor_map", {})
+        downloadable_csv = cached.get("downloadable_csv")  # <-- NEW
+        print("Aitik: Using cached imputation result")
+        imp_vals.to_csv(f"{algo}_imputed.csv", index=False)
     else:
         if algo == "mice":
             imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
         elif algo == "bart":
             # imputer = BartImputer(df.copy(), columns, max_iter=iterations)
-            pass
+            raise HTTPException(status_code=400, detail="BART imputer not implemented.")
         elif algo == "gknn":
             imputer = gKNNImputer(raw_df.copy(), columns)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
 
         # Run imputation
-        orig_vals, imp_vals, combined, mask, test_orig, test_imp, test_mask, downloadable_csv, all_neighbor_map = (
-            imputer.impute()
-        )
+        (
+            orig_vals,
+            imp_vals,
+            combined,
+            mask,
+            test_orig,
+            test_imp,
+            test_mask,
+            downloadable_csv,
+            all_neighbor_map,
+        ) = imputer.impute()
+
         try:
             fname = f"{session_id}_{algo}_neighbor_map.txt"
             with open(fname, "w") as fh:
@@ -363,11 +373,8 @@ async def impute_api(
             print(f"Wrote neighbor map to {fname}")
         except Exception as e:
             print(f"Error writing neighbor map: {e}")
-        # combined.to_csv(f"mice_combined.csv", index=False)
-        # mask.to_csv(f"mice_mask.csv", index=False)
-        # imp_vals.to_csv(f"mice_imputed.csv", index=False)
 
-        # Store in cache
+        # Store in cache (include downloadable_csv here!)
         imputation_store[cache_key] = {
             "original": orig_vals,
             "imputed": imp_vals,
@@ -377,6 +384,7 @@ async def impute_api(
             "test_imp": test_imp,
             "test_mask": test_mask,
             "all_neighbor_map": all_neighbor_map,
+            "downloadable_csv": downloadable_csv,  # <-- NEW
         }
 
     # Save imputed components separately for this session
@@ -389,7 +397,7 @@ async def impute_api(
         "test_imp": test_imp,
         "test_mask": test_mask,
         "all_neighbor_map": all_neighbor_map,
-        "downloadable_csv": downloadable_csv,
+        "downloadable_csv": downloadable_csv,  # now always defined
     }
 
     return {
@@ -476,6 +484,11 @@ def get_test_evaluation(session_id: str = Query(...)):
 
     merged = pd.merge(test_orig_flat, test_imp_flat, on=["index", "column"])
     merged["absolute_diff"] = (merged["original"] - merged["imputed"]).abs()
+    diff = merged["original"] - merged["imputed"]
+    merged["squared_diff"] = diff ** 2
+
+    mae = float(merged["absolute_diff"].mean())          # Mean Absolute Error
+    rmse = float(np.sqrt(merged["squared_diff"].mean())) # Root Mean Squared Error
 
     return {
         "test_evaluation": merged.to_dict(orient="records"),
@@ -484,6 +497,8 @@ def get_test_evaluation(session_id: str = Query(...)):
             "mean_abs_diff": merged["absolute_diff"].mean(),
             "median_abs_diff": merged["absolute_diff"].median(),
             "std_abs_diff": merged["absolute_diff"].std(),
+            "mae": mae,
+            "rmse": rmse,
         }
     }
 
