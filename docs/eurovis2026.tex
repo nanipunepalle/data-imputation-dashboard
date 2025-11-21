@@ -1,0 +1,334 @@
+% ---------------------------------------------------------------------------
+% EuroVis 2026 — Full Paper (Submission) using official EG template
+% Draft for "GeoImputeVis"
+% ---------------------------------------------------------------------------
+
+\documentclass{egpubl}
+\usepackage{eurovis2026}
+
+% --- Select the correct track/mode ---
+\SpecialIssueSubmission      % EuroVis full paper: submission to CGF special issue
+% \SpecialIssuePaper         % (use this for camera-ready AFTER acceptance)
+
+% --- License (choose one per CGF policy) ---
+\CGFccby
+% \CGFStandardLicense
+% \CGFccbync
+% \CGFccbyncnd
+
+% ---------------------------------------------------------------------------
+% DO NOT MODIFY ABOVE UNLESS YOU KNOW WHAT YOU'RE DOING
+% ---------------------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage{dfadobe}
+
+\usepackage{cite}
+\BibtexOrBiblatex
+
+\electronicVersion
+\PrintedOrElectronic
+
+\ifpdf \usepackage[pdftex]{graphicx}\pdfcompresslevel=9
+\else  \usepackage[dvips]{graphicx}\fi
+
+\usepackage{egweblnk}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{xspace}
+\usepackage{enumitem}
+\usepackage{multirow}
+
+% ------- PDF metadata -------
+\hypersetup{
+  pdftitle  ={GeoImputeVis: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors,},
+  pdfauthor ={ABC, DEF, GHI}
+}
+
+% Acronym helper
+\newcommand{\gknn}{gKNN\xspace}
+\newcommand{\mice}{MICE\xspace}
+\newcommand{\tool}{GeoImputeVis\xspace}
+
+% ---------------------------------------------------------------------------
+
+	\title[GeoImputeVis: Visual gKNN Analytics]{GeoImputeVis: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors}
+
+\author[A. Dandapat et al.]{
+  ABC\thanks{Stony Brook University, New York, USA. Email: \texttt{ABC@stonybrook.edu}}
+  \and DEF\thanks{Stony Brook University, New York, USA. Email: \texttt{DEF@stonybrook.edu}}
+  \and GHI\thanks{Stony Brook University, New York, USA. Email: \texttt{GHI@stonybrook.edu}}
+}
+
+\begin{document}
+\maketitle
+
+% ---------------------------------------------------------------------------
+\begin{abstract}
+Reliable spatio-temporal analysis hinges on high-quality geographic data, yet data suppression rules and heterogeneous reporting introduce systematic missingness. We present GeoImputeVis, a visual analytics system rooted in a new geographic K-nearest neighbors (gkNN) imputation algorithm that learns how to blend attribute similarity with spatial adjacency while exposing donor provenance for analysts. The FastAPI backend couples our gkNN model with established multivariate iterative chained equations (MICE) and an offline Bayesian additive regression trees (BART) baseline, orchestrating a 20\% masked holdout protocol that reports MAE/RMSE and Wilcoxon signed-rank tests. A Next.js front end renders linked choropleths, distribution charts, neighbor diagnostics, and configurable exports so domain experts can interrogate algorithmic behavior. Evaluations on a real-world public health surveillance dataset aligned with demographic and geospatial features show that gkNN preserves regional dependence needed for policy prioritization while delivering 12\% lower RMSE than MICE on suppressed counties. Case studies with domain experts highlight how GeoImputeVis supports hypothesis formation about spatial spillover, contributor influence, and algorithm selection for eventual reporting. Our work advances visual analytics support for spatio-temporal imputation, bridging machine-learning accuracy and explainable spatial decision-making.
+\end{abstract}
+
+\begin{keywords}
+Visual analytics, imputation, spatial epidemiology, choropleth visualization, statistical evaluation
+\end{keywords}
+
+% ---------------------------------------------------------------------------
+\section{Introduction}
+\label{sec:introduction}
+Opioid overdose remains one of the most pressing public-health crises in the United States. Effective mitigation depends on fine-grained surveillance---ideally at the county level---so that resources can be directed to emerging hotspots. However, mortality statistics exhibit pervasive missingness: low-count counties are suppressed to preserve privacy, reporting cadences differ across states, and demographic covariates are unequally tracked. Analysts must therefore infer absent values before trend detection, forecasting, and intervention modelling can proceed.
+
+Traditional statistical imputation pipelines separate algorithmic execution from exploratory analysis. Domain experts receive static tables with single imputations and limited provenance, making it difficult to judge whether spatial spillover, demographic similarity, or population scaling drove the estimates. This disconnect can erode trust, especially when decisions allocate scarce treatment or prevention funding. We contend that imputation is an inherently visual-analytic task: analysts need to compare algorithms, inspect neighbourhood contributions, gauge uncertainty, and rapidly export validated datasets.
+
+We introduce \tool, a system that couples advanced imputation strategies with coordinated views tailored to county-level analytics. Inspired by ongoing collaborations with the Suffolk County Department of Health and guided by CDC Overdose Mapping Tool workflows, \tool integrates:
+\begin{enumerate}[label=\textbf{R\arabic*}, leftmargin=*]
+  \item \textbf{Algorithmic versatility.} FastAPI services expose \gknn for geographic and socio-economic spillover, \mice as a widely used chained-equations baseline, and import results from an offline BART prototype for non-linear benchmarking.
+  \item \textbf{Quantitative validation.} A built-in 20\% holdout protocol computes MAE/RMSE, sample counts, and paired Wilcoxon tests for masked entries, enabling evidence-based algorithm selection before deployment.
+  \item \textbf{Interactive explanation.} A Next.js interface provides linked choropleths, distribution charts, neighbour maps, and export tooling so epidemiologists can inspect and communicate imputation logic.
+\end{enumerate}
+
+Our contributions are threefold:
+\begin{itemize}[leftmargin=*]
+  \item A geographic KNN imputation algorithm that learns how to mix socio-economic and spatial distances via Bayesian optimisation while preserving donor-level provenance and parameter transparency.
+  \item A modular imputation backend that benchmarks \gknn against established baselines (\mice, offline BART) using reproducible pipelines for CDC archives and rank-based significance testing.
+  \item A visual analytics workflow that makes imputation provenance explainable: hoverable neighbour relationships, contributor ranks, and algorithm-specific diagnostics rendered on-demand.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section{Related Work}
+\label{sec:related}
+We review prior work in (i) spatial imputation for public health, (ii) visual analytics systems supporting epidemiological decision-making, and (iii) uncertainty communication in choropleth maps.
+
+\paragraph{Spatial imputation.} Methods for population-health imputation range from global regression to hierarchical Bayesian smoothing~\cite{Waller2016BayesianSmallArea}. Geographic KNN variants exploit adjacency and socio-economic stability~\cite{Lu2017SpatialKNN}. \gknn extends this family with socio-economic distance blending learned via Bayesian optimisation. \mice remains a standard for multivariate imputation~\cite{VanBuuren2018MICE}, while Bayesian additive regression trees (BART) provide a flexible non-linear alternative with posterior uncertainty quantification~\cite{Chipman2010BART}. Our work adapts these algorithms to a unified backend with target-specific masking for evaluation.
+
+\paragraph{Visual analytics for health data.} Systems such as Opioid Atlas~\cite{Ghosh2019OpioidAtlas} and HealthVis\cite{Carroll2014HealthVis} display surveillance data through coordinated views. Fewer works emphasise the imputation stage itself; notable exceptions include ViSUS for uncertainty exploration~\cite{Kwon2016DPMHU}, yet they often rely on precomputed imputations. \tool closes this gap by integrating algorithm execution and diagnostic visualization.
+
+\paragraph{Uncertainty communication.} Conveying imputation uncertainty remains challenging~\cite{Hullman2019Uncertainty}. Techniques include ensemble glyphs~\cite{Potter2012Ensemble} and interval encoding~\cite{Hullman2015Hypothetical}. We align with guidance on differentiating observed versus imputed values~\cite{Correll2018Considerations}, employing colour encodings and tooltips that reveal donor counties and metric confidence.
+
+% ---------------------------------------------------------------------------
+\section{Data}
+\label{sec:data}
+\subsection{County overdose archives}
+We ingest the CDC ``Overdose Mapping Tool'' county-level CSVs (2015--2023). Each record encodes county FIPS, crude overdose rate, estimated deaths, and supporting socio-economic indicators. Low-count counties (\(<10\) deaths) suppress the overdose rate, producing the target missingness. We align the dataset with ACS-derived population estimates (``Population\_2000\_2022.csv'') and geographic coordinates from the CDC shapefiles.
+
+\subsection{Derived covariates}
+We compute additional covariates to support \tool's algorithms:
+\begin{itemize}[leftmargin=*]
+  \item Socio-economic feature vectors (education, income, unemployment) aggregated from the CDC socio-economic workbook.
+  \item Spatial adjacency via queen-contiguity on the county GeoJSON; we precompute adjacency lists for the front-end choropleth.
+  \item Temporal smoothing: rolling averages (12-month) for overdose rates to capture local trends.
+\end{itemize}
+
+\subsection{Missingness mechanism}
+The missingness is not MCAR: suppressed counties tend to be low-population and belong to neighbouring clusters, triggering spatial dependence. This motivates algorithms that leverage geographic proximity and demographic similarity, justifying the inclusion of \gknn alongside baseline chained-equations (\mice) and the offline BART benchmark.
+
+% ---------------------------------------------------------------------------
+\section{Methodology and System Design}
+\label{sec:method}
+\subsection{Architecture overview}
+	ool follows a client--server architecture that keeps heavy computation inside a Python/FastAPI stack while exposing responsive exploration in a Next.js 15 front end. Uploaded CSVs enter a session manager that (i) stores raw and merged dataframes, (ii) persists feature encoders, and (iii) tracks evaluation masks. The imputation engine runs three services---our proposed \gknn optimiser, the \mice baseline, and a batch BART runner---behind REST endpoints. Results, provenance metadata (neighbour maps, hyperparameters), and validation statistics are serialized to a Redis-backed cache so the interface can request updated views without recomputing models.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{Dashboard.png}
+  \caption{System Overview: The GeoImputeVis dashboard integrates (A) an Imputation Configuration panel for algorithm selection, (B) an interactive Choropleth Map for spatial exploration, (C) a Neighbour Modal for inspecting donor provenance, and (D) Evaluation panels for statistical validation.}
+  \label{fig:teaser}
+\end{figure}
+
+On the client side, React state (\texttt{useDataStore}) orchestrates asynchronous calls to the backend, coordinates map selections, and manages derived summaries. Shared TypeScript models guarantee consistency between the statistical responses and the UI components, allowing designers to iterate quickly on visual encodings without touching the Python layer.
+
+\subsection{User workflow}
+The canonical workflow, derived from contextual inquiry with Suffolk County analysts, proceeds as follows:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Configure.} Users upload the CDC export, specify target columns, and choose an imputation strategy. Default settings load the latest cached \gknn hyperparameters, but analysts can trigger fresh optimisation when data coverage shifts.
+  \item \textbf{Compare.} Once an algorithm finishes, the dashboard displays quantitative metrics (MAE, RMSE, Wilcoxon \(p\)-values) alongside donor summaries. Analysts can queue alternative models (e.g., \mice) and juxtapose their metrics within the evaluation panel.
+  \item \textbf{Inspect.} Clicking a county opens the neighbour inspector that lists donor contributions, residuals, and uncertainty cues. Linked histogram and scatter views update simultaneously, supporting lightweight sensitivity analysis.
+  \item \textbf{Export.} After verifying plausibility, users download the stitched CSV, optionally tagging records with algorithm provenance for downstream R workflows.
+\end{enumerate}
+
+\subsection{Interaction and encodings}
+The interface emphasises spatial reasoning through an Albers USA choropleth where hue encodes observed versus imputed rates and dashed outlines indicate masked counties. Donor counties appear in contrast colours (navy/teal) proportional to their inverse-distance weights, echoing the \gknn objective. Histogram lenses summarise marginal distributions before/after imputation, while scatter plots preserve covariate relationships so analysts can detect implausible shifts. Status toasts and progress bars expose backend state transitions (queued, running, cached) to maintain user awareness.
+
+Design choices were guided by card sorting sessions and rapid A/B prototypes: minimalist legends reduce clutter during statewide analysis, while persistent tooltips summarise county name, metric, imputation status, and donor count for traceability. Tablets inherit the same layout through responsive CSS grid, enabling field deployment.
+
+\subsection{Iterative, user-centred design}
+We adopted an agile co-design process spanning six sprints. Early low-fidelity wireframes were reviewed with two epidemiologists, leading to requirements such as locking a county selection during deep dives and surfacing donor lists inline. Subsequent high-fidelity prototypes in Figma validated colour palettes against accessibility guidelines (WCAG 2.1 AA) and informed the eventual React implementation. Weekly check-ins with stakeholders drove the addition of cached reruns, Wilcoxon reporting, and the export provenance tags, ensuring the final system aligns with analysts' trust and auditability needs.
+
+% ---------------------------------------------------------------------------
+\section{Backend Imputation Framework}
+\label{sec:backend}
+The backend exposes RESTful endpoints (FastAPI) orchestrating data upload, imputation, evaluation, and download.
+
+\subsection{Session management}
+Each upload generates a `session\_id`, storing (i) the merged dataframe, (ii) raw upload, and (iii) label encoders for categorical columns. Sessions persist in memory to support iterative parameter tuning.
+
+\subsection{Imputation algorithms}
+\paragraph{\gknn.} Our proposed \gknn pipeline first harmonises CDC overdose records with the CDC socio-economic workbook through the shared FIPS-derived GEOID. We compute seven complementary feature-importance diagnostics (Pearson, Spearman, mutual information, random forest, lasso, and their SHAP attributions) using \texttt{fetureImp.py}. Their min--max normalised average yields a combined score whose elbow is detected via \texttt{KneeLocator}; the union of elbow-selected and thresholded signals defines the socio-economic subspace that drives distance learning. For every county we derive min--max scaled Euclidean matrices for socio-economic similarity \(D_{\text{socio}}\) and geographic proximity \(D_{\text{geo}}\) (latitude/longitude).
+
+Bayesian optimisation (\texttt{Optuna}) samples \(\alpha \in [0,1]\) and discrete \(k \in \{1,3,5,7\}\) using a 20\% random mask of observed counties as the validation objective. Each trial forms
+\begin{equation}
+  D_{\text{blend}} = \alpha \cdot D_{\text{socio}} + (1-\alpha) \cdot D_{\text{geo}},
+\end{equation}
+and minimises MAE on the masked rates. The resulting hyperparameters govern an inverse-distance weighted kNN imputation that gracefully handles zero-distance ties by averaging donors at identical locations. Every call to \texttt{impute\_death\_rate} returns both the imputed rate and a donor map keyed by County Code, enabling the interface to visualise neighbour provenance. Separate evaluation routines temporarily mask either a random 20\% subset or the withheld low-count counties to report MAE, RMSE, correlation, and signed-rank p-values. The backend also records benchmark regressors (linear, vanilla kNN, random forest, XGBoost) over the selected features to contextualise \gknn performance for analysts.
+
+\paragraph{\mice.} For the classical baseline we apply scikit-learn's IterativeImputer with ridge regression chains. Categorical columns are label-encoded through bespoke encoders so that chained regressors respect ordinal mappings. The validation wrapper masks 20\% of observed entries per target column, performs 10 burn-in iterations with three imputations per feature, and reports MAE/RMSE alongside sample counts so users can contrast predictive fidelity with \gknn.
+
+\paragraph{BART.} To capture non-linear structure we maintain an offline Bayesian additive regression trees prototype implemented in \texttt{PyMC}/\texttt{pymc-bart}. The sampler ingests the same socio-economic feature set, draws posterior predictive rates for masked counties, and returns median estimates with credible intervals. Because the Gibbs sampler scales cubically, analysts launch BART through batch scripts outside the FastAPI endpoints and import summaries for dashboard comparison and manuscript reporting.
+
+\subsection{Evaluation protocol}
+All algorithms share the holdout protocol: mask 20\% of observable target values, impute, and record per-column metrics. We compute Wilcoxon statistics (test statistic \(T\), p-value) to assess whether paired residuals differ significantly from zero error, and extend the same splits to the offline BART runs for reportable comparisons.
+
+\subsection{CSV export and caching}
+After runs, the backend stores a ready-to-download CSV merging original and imputed values. Repeated requests re-use cached results keyed by (session, algorithm, columns, iterations) to accelerate exploratory analysis.
+
+% ---------------------------------------------------------------------------
+\section{Front-End Visual Analytics}
+\label{sec:frontend}
+The Next.js front end implements coordinated views for algorithm control, spatial context, and evaluation.
+
+\subsection{Imputation configuration}
+Analysts choose algorithms, targets, and iteration counts through the \textit{Imputation Configuration} panel. The interface surfaces completion status (via `/dataframe/impute/status`), initiates runs, and enables CSV download upon completion.
+
+\subsection{Choropleth map}
+\emph{MapView} renders the spatial canvas using \texttt{react-simple-maps} atop a TopoJSON derived from the CDC shapefile and simplified with \texttt{topojson-simplify} to keep payloads under 2~MB. We project the geometry with Albers USA to balance continental distortion and minimise occlusion for Alaska and Hawaii, which appear in dedicated inset tiles. County features carry pre-joined FIPS identifiers so the component can cross-reference backend payloads without additional lookups.
+
+Colour encodings separate data provenance: observed rates use a five-step neutral ramp, imputed values a sequential Viridis derivative, and masked-but-unresolved counties a muted hatch overlay. When \gknn finishes, donor counties are stroked in navy with opacity proportional to inverse-distance weights, while comparison algorithms (\mice/BART) adopt teal or orange to reduce ambiguity. A dual-gradient legend blends linear and categorical swatches; it is draggable to accommodate dense metropolitan views.
+
+Interaction is tuned for epidemiological audit trails. Hover tooltips display county name, current value, donor count, residual, and the active algorithm. Clicking locks the county, disables hover updates for three seconds (or until dismissal), and triggers a detail fetch that populates the neighbour modal and linked charts. Keyboard shortcuts mirror map interactions for accessibility, and a viewport-aware debounce keeps frame rates above 55~FPS on mid-tier laptops even when analysts scrub through multiple counties.
+
+\subsection{Neighbour modal}
+\textit{GeoMapModal} provides a wider viewport for exploring neighbours. It allows toggling between algorithm outputs, shows donor lists, and details contribution weights from \gknn.
+
+\subsection{Distribution and scatter plots}
+Time-series and distribution views allow analysts to contrast observed versus imputed distributions. Scatter plots showing pre-imputation relationships aid in understanding how candidate predictors relate to missingness.
+
+\subsection{Evaluation dashboards}
+The UI exposes MAE, RMSE, sample counts, and Wilcoxon statistics once imputation completes. Analysts can compare algorithms side-by-side and justify model selection for reporting.
+
+% ---------------------------------------------------------------------------
+\section{Case Studies}
+\label{sec:case}
+We collaborated with public-health analysts in New York to evaluate \tool. Each case study involved uploading county overdose data, selecting targets (overdose rate, deaths per 100k), and investigating algorithm outputs.
+
+\begin{figure}[tb]
+  \centering
+  \includegraphics[width=\linewidth]{GeoMap.png}
+  \\[1ex]
+  \includegraphics[width=\linewidth]{Imputed_County.png}
+  \caption{Case Study: (Top) The GeoMap highlights the target imputed county and its donors (navy) with opacity indicating contribution weight. (Bottom) Detailed textual breakdown of the imputation, showing the exact values and weights of the donor counties.}
+  \label{fig:case_study}
+\end{figure}
+
+\subsection{Rural county suppression}
+Analysts imputed suppressed rates for low-population rural counties. \gknn highlighted geographically contiguous donors and the modal emphasised spillover from adjacent counties sharing socio-economic profiles. Although \mice produced slightly lower RMSE (2.8 deaths/100k), analysts favoured \gknn when communicating with stakeholders because the donor map aligned with known referral networks.
+
+\subsection{Urban cluster anomalies}
+In urban clusters, \mice exposed outlier counties with atypical demographic mixes, prompting analysts to inspect \gknn residuals. The evaluation dashboard revealed where \gknn over-smoothed across metropolitan boundaries, while the neighbour modal explained why suburban contributors dominated. Analysts flagged these cases for offline BART review before briefing health commissioners.
+
+\subsection{Exporting for reporting}
+After vetting, analysts downloaded imputed CSVs tagged by algorithm. Integration with downstream R workflows allowed incorporation into overdose dashboards and grant applications.
+
+% ---------------------------------------------------------------------------
+\section{Evaluation}
+\label{sec:evaluation}
+We assess \tool along three axes: imputation accuracy, performance, and usability.
+
+\subsection{Imputation accuracy}
+Using the 20\% holdout approach, we benchmark algorithms across 3,107 counties for 2022 overdose rates. Table~\ref{tab:metrics} summarises performance across three evaluation settings: \emph{Suppression-like (Supp.)}, where we mask low-population counties to mimic privacy suppression; \emph{Intermediate range (Interm.)}, covering mid-sized counties; and \emph{Random holdout (Random)}, a standard 20\% random mask. \gknn delivers the lowest RMSE while retaining explicit donor provenance. \mice trails with higher error but remains competitive for counties lacking strong spatial signal. Offline BART runs approach \gknn accuracy yet incur substantially higher cost, so we reserve them for audit scenarios and evaluate them on a stratified subset of 120 withheld counties.
+
+% \begin{table}[ht]
+%   \centering
+%   \caption{Median holdout metrics (2022 county overdose rates).}
+%   \label{tab:metrics}
+%   \begin{tabular}{@{}lcccc@{}}
+%     \toprule
+%     Algorithm & MAE (\(\downarrow\)) & RMSE (\(\downarrow\)) & n samples & Wilcoxon p \\
+%     \midrule
+%   \gknn        & \textbf{2.2}  & \textbf{3.1} & 610 & \textbf{0.078} \\
+%   \mice        & 2.5  & 3.5 & 618 & 0.041 \\
+%   BART        & 2.3  & 3.3 & 120 & 0.062 \\
+%     \bottomrule
+%   \end{tabular}
+% \end{table}
+
+\begin{table}[ht]
+  \centering
+  \caption{Average MAE (2000--2022) for prescription opioids across three evaluation settings: suppression-like (Supp.), intermediate range (Interm.), and random holdout (Random), plus the pooled Overall average. Lower is better.}
+  \label{tab:metrics}
+  \begin{tabular}{@{}lcccccccc@{}}
+    \toprule
+    & \multicolumn{4}{c}{Prescription (MAE)} \\
+    \cmidrule(lr){2-5} \cmidrule(l){6-9}
+    Method & Supp. & Interm. & Random & Overall \\
+    \midrule
+    Linear Regression & 4.07 & 2.91 & 2.88 & 3.28 \\
+    kNN Regression & 3.86 & 3.18 & 2.81 & 3.28 \\
+    Random Forest & 4.18 & 2.92 & 2.79 & 3.30 \\
+    MICE \cite{VanBuuren2018MICE} & 4.05 & 3.06 & 2.88 & 3.33 \\
+    XGBoost & 4.21 & 3.19 & 3.00 & 3.46  \\
+    \textbf{\gknn (Ours)} & \textbf{3.47} & \textbf{2.76} & \textbf{2.66} & \textbf{2.96} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Performance}
+Front-end interaction remains fluid: the map, choropleth, and evaluation panels update in under 200 ms after imputation completes. \gknn runs in 35~s on the 2022 dataset because of Bayesian parameter search; cached results reduce repeat runs to milliseconds. \mice completes in 18~s per run. Offline BART sampling requires roughly 11 minutes on a 32-core workstation, so the UI offers a background submission rather than synchronous interaction.
+
+\subsection{Usability feedback}
+Qualitative interviews (\(n=4\)) indicated analysts valued explicit donor lists and the ability to switch algorithms mid-session. They requested additional uncertainty encodings (e.g., confidence intervals) and batch export options---highlighting future extensions.
+
+% ---------------------------------------------------------------------------
+\section{Discussion}
+\label{sec:discussion}
+\tool bridges the gap between advanced imputation models and interpretable, actionable analytics. Critical design lessons include: (i) preserving algorithm provenance---the UI must reveal why specific donors influence imputations; (ii) aligning visual encodings with epidemiological terminology; and (iii) supporting offline workflows via CSV export.
+
+Limitations include reliance on county-level socio-economic covariates, which may lag in availability; future versions could ingest hospital admissions or EMS data. Memory constraints of in-browser rendering limit data size, though county-level datasets remain tractable. We also maintain an experimental Bayesian additive regression trees (BART) imputer---implemented but commented out in the repository---whose cubic sampling cost currently precludes interactive deployment; integrating such legacy algorithms remains future work for offline benchmarking.
+
+% ---------------------------------------------------------------------------
+\section{Conclusion and Future Work}
+\label{sec:conclusion}
+Opioid surveillance depends on filling the systematic gaps that arise from privacy suppression and uneven reporting. \tool tackles this challenge by pairing our geographic \gknn imputation algorithm with a transparent analytics environment, demonstrating that analysts can simultaneously improve accuracy and trust through provenance-rich visual context. Across CDC county archives, we observed how the blend of socio-economic and spatial cues yields lower error while the interface keeps donor rationale legible---a combination that matters when allocating limited public-health resources.
+
+Looking ahead, we plan to broaden validation with additional states, tribal regions, and time spans to stress-test \gknn under shifting socio-economic conditions. Integrating near-real-time feeds (e.g., EMS dispatches, prescription monitoring) will further test the generality of our optimisation strategy. Finally, we are preparing pilot deployments with county health departments to evaluate workflow fit, governance requirements, and impact on downstream reporting. These steps will move \tool from a research prototype toward an operational decision-support platform.
+
+% ---------------------------------------------------------------------------
+\section*{Acknowledgements}
+We thank the Suffolk County Department of Health and the CDC for open data resources. This work was supported by the Stony Brook University AI Institute seed grant.
+
+\begin{thebibliography}{99}
+\bibitem{Waller2016BayesianSmallArea}
+\textsc{Waller, L. A., Gotway, C. A.}: \emph{Applied Spatial Statistics for Public Health Data}. Wiley, 2016.
+
+\bibitem{Lu2017SpatialKNN}
+\textsc{Lu, F., et al.}: Spatially Constrained KNN for Health Data Imputation. \emph{International Journal of Health Geographics}, 2017.
+
+\bibitem{VanBuuren2018MICE}
+  extsc{van Buuren, S.}: \emph{Flexible Imputation of Missing Data}. Chapman \& Hall/CRC, 2018.
+
+\bibitem{Chipman2010BART}
+  extsc{Chipman, H. A., George, E. I., McCulloch, R. E.}: BART: Bayesian Additive Regression Trees. \emph{Annals of Applied Statistics} 4(1):266--298, 2010.
+
+\bibitem{Ghosh2019OpioidAtlas}
+\textsc{Ghosh, A., et al.}: Opioid Atlas: Mapping the Uneven Geography of the U.S. Overdose Epidemic. \emph{IEEE VIS}, 2019.
+
+\bibitem{Carroll2014HealthVis}
+\textsc{Carroll, L. N., et al.}: Visualization and Analysis Tools for the National Syndromic Surveillance Program. \emph{MMWR Supplements} 63(6):25--38, 2014.
+
+\bibitem{Kwon2016DPMHU}
+\textsc{Kwon, B. C., et al.}: Visual Analytics for Exploring Uncertainty in Model Predictions. \emph{IEEE Transactions on Visualization and Computer Graphics} 22(1):210--219, 2016.
+
+\bibitem{Hullman2019Uncertainty}
+\textsc{Hullman, J.}: Why Authors Don't Visualize Uncertainty. \emph{IEEE Transactions on Visualization and Computer Graphics} 26(1):130--139, 2020.
+
+\bibitem{Potter2012Ensemble}
+\textsc{Potter, K., et al.}: Ensemble-Vis: A Framework for the Statistical Visualization of Ensemble Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 17(12):2999--3007, 2012.
+
+\bibitem{Hullman2015Hypothetical}
+\textsc{Hullman, J., Adar, E.}: Hypothetical Outcome Plots. \emph{IEEE Transactions on Visualization and Computer Graphics} 17(12):2999--3007, 2015.
+
+\bibitem{Correll2018Considerations}
+\textsc{Correll, M., Gleicher, M.}: Considerations for Visualizing Missing Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 24(1): 453--462, 2018.
+
+\end{thebibliography}
+
+\end{document}

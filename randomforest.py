@@ -1,5 +1,6 @@
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
 import pandas as pd
@@ -7,7 +8,7 @@ import io
 from customLabelEncoder import CustomLabelEncoder
 
 
-class MiceImputer:
+class RandomForestImputer:
     def __init__(self, df, cols, max_iter=25, random_state=42, treat_none_as_category=False):
         self.df = df.copy()
         self.cols = cols
@@ -32,7 +33,7 @@ class MiceImputer:
 
     def impute(self):
         """
-        Imputes missing values using MICE across specified columns.
+        Imputes missing values using Random Forest (via IterativeImputer) across specified columns.
         Also masks 20% of existing non-null values in target columns for evaluation,
         and returns both full and evaluation-specific results. Also creates a CSV
         representation of the imputed dataframe (in-memory) and stores it on the instance.
@@ -53,7 +54,7 @@ class MiceImputer:
         # Ensure all columns to be imputed are numerical
         for col in self.cols:
             if col not in numerical_cols:
-                raise ValueError(f"Column '{col}' is not numeric after encoding. Cannot proceed with MICE.")
+                raise ValueError(f"Column '{col}' is not numeric after encoding. Cannot proceed with Random Forest imputation.")
 
         # Save original values and mask
         original_series = self.df[self.cols].copy()
@@ -79,8 +80,10 @@ class MiceImputer:
                 evaluation_mask.loc[sample_indices, col] = True
                 self.df.loc[sample_indices, col] = np.nan  # Mask for evaluation
 
-        # Impute using IterativeImputer
-        imputer = IterativeImputer(max_iter=self.max_iter, random_state=self.random_state)
+        # Impute using IterativeImputer with RandomForestRegressor
+        # n_jobs=-1 uses all available cores
+        rf_estimator = RandomForestRegressor(n_jobs=-1, random_state=self.random_state)
+        imputer = IterativeImputer(estimator=rf_estimator, max_iter=self.max_iter, random_state=self.random_state)
         imputed_values = imputer.fit_transform(self.df[numerical_cols])
 
         # Update self.df with imputed values
