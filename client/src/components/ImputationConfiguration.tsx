@@ -16,12 +16,15 @@ import MissingnessSummaryChart from './MissingnessSummaryChart';
 import GeoMapModal from './GeoMapModal';
 
 const { Option } = Select;
-const algorithms = ['gKNN', 'MICE', 'BART'];
+const algorithms = ['gKNN', 'MICE', 'Random Forest', 'XGBoost', 'KNN Regressor'];
 
 const algorithmDurations: Record<string, number> = {
     gKNN: 2000,
     MICE: 5000,
-    BART: 8000,
+    'Random Forest': 10000,
+    XGBoost: 8000,
+    'KNN Regressor': 5000,
+    // BART: 8000,
 };
 
 const ImputationConfiguration: React.FC = () => {
@@ -233,8 +236,8 @@ const ImputationConfiguration: React.FC = () => {
                                 <Button>
                                     <GeoMapModal />
                                 </Button>
-                                <Button 
-                                    type="default" 
+                                <Button
+                                    type="default"
                                     onClick={async () => {
                                         const sessionId = localStorage.getItem('session_id');
                                         if (!sessionId) {

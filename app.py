@@ -17,6 +17,9 @@ from fastapi import Request
 from fastapi import HTTPException
 
 from mice import MiceImputer
+from randomforest import RandomForestImputer
+from xgboost_imputer import XGBoostImputer
+from knn_imputer import KNNRegressorImputer
 # from bart import BartImputer
 from gknn import gKNNImputer
 from customLabelEncoder import CustomLabelEncoder
@@ -345,6 +348,12 @@ async def impute_api(
             raise HTTPException(status_code=400, detail="BART imputer not implemented.")
         elif algo == "gknn":
             imputer = gKNNImputer(raw_df.copy(), columns)
+        elif algo == "random forest":
+            imputer = RandomForestImputer(df.copy(), columns, max_iter=iterations)
+        elif algo == "xgboost":
+            imputer = XGBoostImputer(df.copy(), columns, max_iter=iterations)
+        elif algo == "knn regressor":
+            imputer = KNNRegressorImputer(df.copy(), columns, max_iter=iterations)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
 
@@ -360,19 +369,6 @@ async def impute_api(
             downloadable_csv,
             all_neighbor_map,
         ) = imputer.impute()
-
-        try:
-            fname = f"{session_id}_{algo}_neighbor_map.txt"
-            with open(fname, "w") as fh:
-                json.dump(
-                    all_neighbor_map,
-                    fh,
-                    default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o),
-                    indent=2,
-                )
-            print(f"Wrote neighbor map to {fname}")
-        except Exception as e:
-            print(f"Error writing neighbor map: {e}")
 
         # Store in cache (include downloadable_csv here!)
         imputation_store[cache_key] = {
@@ -489,6 +485,9 @@ def get_test_evaluation(session_id: str = Query(...)):
 
     mae = float(merged["absolute_diff"].mean())          # Mean Absolute Error
     rmse = float(np.sqrt(merged["squared_diff"].mean())) # Root Mean Squared Error
+    print(f"  Number of test samples: {len(merged)}")
+    print(f"  MAE: {mae}")
+    print(f"  RMSE: {rmse}")
 
     return {
         "test_evaluation": merged.to_dict(orient="records"),

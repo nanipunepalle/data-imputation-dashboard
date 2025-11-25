@@ -210,8 +210,8 @@ class gKNNImputer:
 
         # Perform Bayesian parameter search using the filtered training_data.
         best_params, MAE_results = bayesian_search(training_data, socio_data, geo_data, target, 300)
-        print("best_params: ", best_params)
-        print("MAE_results: ", MAE_results)
+        # print("best_params: ", best_params)
+        # print("MAE_results: ", MAE_results)
         
         best_alpha, best_beta, best_k = best_params
 
