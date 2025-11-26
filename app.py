@@ -110,8 +110,13 @@ def get_merged_df(df):
 async def get_dataframe_api(file: UploadFile = File(...)):
     contents = await file.read()
     df = pd.read_csv(BytesIO(contents)).replace([np.inf, -np.inf], np.nan)
-    merged_df = get_merged_df(df)
+    # merged_df = get_merged_df(df)
     # merged_df = df
+
+    if 'County Code' in df.columns:
+        merged_df = get_merged_df(df)
+    else:
+        merged_df = df
 
     session_id = uuid.uuid4().hex
     session_store[session_id] = merged_df
@@ -459,6 +464,7 @@ def get_column_distribution(session_id: str = Query(...), column: str = Query(..
 def get_test_evaluation(session_id: str = Query(...)):
     """
     Returns the 20% masked test original and imputed values for evaluation.
+    Adds per-column MAE/RMSE and normalized metrics to compare across datasets.
     """
     if session_id not in imputation_store:
         raise HTTPException(
@@ -471,7 +477,7 @@ def get_test_evaluation(session_id: str = Query(...)):
     if test_orig is None or test_imp is None:
         raise HTTPException(status_code=404, detail="Test evaluation data not found.")
 
-    # Flatten to return only aligned, non-null pairs
+    # Flatten
     test_orig_flat = test_orig.stack().reset_index()
     test_imp_flat = test_imp.stack().reset_index()
 
@@ -509,62 +515,128 @@ def get_scatter_plot_data(
     y_column: str = Query(...)
 ):
     if session_id not in imputation_store:
-        raise HTTPException(status_code=400, detail="No imputation data for this session.")
+        raise HTTPException(
+            status_code=400,
+            detail="No imputation data for this session."
+        )
 
     imputed_df = imputation_store[session_id]["imputed"]
     mask_df = imputation_store[session_id].get("mask")
     combined_df = imputation_store[session_id]["combined"]
 
-    original_df = session_store.get(session_id)
-    original_df.to_csv(f"original_df.csv", index=False)
-    original_df["County Code"] = pd.to_numeric(original_df["County Code"], errors="coerce").astype("Int64")
-    mask_df["County Code"] = pd.to_numeric(mask_df["County Code"], errors="coerce").astype("Int64")
-    original_df = original_df.sort_values(by="County Code").reset_index(drop=True)
+    # --- Prefer raw DF, fall back to merged DF, but avoid DataFrame in boolean context ---
+    raw_df = session_store.get(session_id + "raw")
+    merged_df = session_store.get(session_id)
 
-    # original_df = imputation_store[session_id]["combined"]
-    if original_df is None or x_column not in original_df.columns:
-        raise HTTPException(status_code=400, detail="X column not found in original dataset.")
+    if raw_df is not None:
+        original_df = raw_df
+    elif merged_df is not None:
+        original_df = merged_df
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="No original dataset found for this session."
+        )
 
-    if y_column not in imputed_df.columns:
-        raise HTTPException(status_code=400, detail="Invalid y column.")
+    if x_column not in original_df.columns:
+        raise HTTPException(
+            status_code=400,
+            detail=f"X column '{x_column}' not found in original dataset."
+        )
+
+    if y_column not in combined_df.columns:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Y column '{y_column}' not found in imputed/combined dataset."
+        )
+
+    if mask_df is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Imputation mask not found for this session."
+        )
 
     points = []
-    if "County Code" not in mask_df.columns:
-        raise HTTPException(status_code=400, detail="'County Code' column not found in combined dataset.")
 
-    for county_code in mask_df["County Code"].dropna().unique():
-        county_row = original_df[original_df["County Code"] == county_code]
-        if county_row.empty:
-            print("AITIK: county_row is empty for County Code:", county_code)
-            continue
-        else:
+    # --- Decide whether we can use County Code join (CDC case) ---
+    use_county_code = (
+        "County Code" in original_df.columns
+        and "County Code" in mask_df.columns
+        and "County Code" in combined_df.columns
+    )
+
+    if use_county_code:
+        # --- CDC / County Code path ---
+        original_df = original_df.copy()
+        mask_df = mask_df.copy()
+        combined_df = combined_df.copy()
+
+        for df_ in (original_df, mask_df, combined_df):
+            df_["County Code"] = (
+                pd.to_numeric(df_["County Code"], errors="coerce")
+                .astype("Int64")
+            )
+
+        for county_code in mask_df["County Code"].dropna().unique():
+            county_row = original_df[original_df["County Code"] == county_code]
+            if county_row.empty:
+                continue
+
+            # X from original_df
             x_val = county_row.iloc[0][x_column] if x_column in county_row.columns else None
-            idx = mask_df[mask_df["County Code"] == county_code].index[0]
-            y_val = combined_df.at[idx, y_column] if idx in combined_df.index else None
-    
-        
-    # for idx in original_df.index:
-    #     x_val = original_df.at[idx, x_column] if idx in original_df.index else None
-    #     if idx in combined_df.index and combined_df.at[idx, y_column]:
-    #         y_val = combined_df.at[idx, y_column] if idx in combined_df.index else None
-    
-        if pd.isna(x_val) or pd.isna(y_val):
-            continue  # Skip missing
 
-        is_imputed = False
-        if mask_df is not None and y_column in mask_df.columns:
-            is_imputed = bool(mask_df[mask_df["County Code"] == county_code].iloc[0][y_column])
-        points.append({
-            "x": float(x_val),
-            "y": float(y_val),
-            "label": "Imputed" if is_imputed else "Rest"
-        })
+            # Match row index in mask/combined via County Code
+            idx_candidates = mask_df.index[mask_df["County Code"] == county_code]
+            if len(idx_candidates) == 0:
+                continue
+            idx = idx_candidates[0]
+
+            y_val = combined_df.at[idx, y_column] if idx in combined_df.index else None
+
+            if pd.isna(x_val) or pd.isna(y_val):
+                continue
+
+            is_imputed = False
+            if y_column in mask_df.columns:
+                is_imputed = bool(mask_df.at[idx, y_column])
+
+            points.append(
+                {
+                    "x": float(x_val),
+                    "y": float(y_val),
+                    "label": "Imputed" if is_imputed else "Rest",
+                }
+            )
+    else:
+        # --- Generic index-based path (no County Code) ---
+        for idx in combined_df.index:
+            if idx not in original_df.index:
+                continue
+
+            x_val = original_df.at[idx, x_column]
+            y_val = combined_df.at[idx, y_column]
+
+            if pd.isna(x_val) or pd.isna(y_val):
+                continue
+
+            is_imputed = False
+            if y_column in mask_df.columns and idx in mask_df.index:
+                is_imputed = bool(mask_df.at[idx, y_column])
+
+            points.append(
+                {
+                    "x": float(x_val),
+                    "y": float(y_val),
+                    "label": "Imputed" if is_imputed else "Rest",
+                }
+            )
 
     return {
         "x_column": x_column,
         "y_column": y_column,
         "points": points
     }
+
 
 @app.get("/dataframe/neighbor_map")
 def get_neighbor_map(session_id: str = Query(...)):
