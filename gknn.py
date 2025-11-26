@@ -34,7 +34,8 @@ class gKNNImputer:
         return "CDC time series/Population/Population_2000_2022.csv"
     
     def merge_cdc_missing(self, cdc_df, missing):
-        missing['County Code'] = missing['County Code'].apply(lambda x: str(int(x)) if not pd.isna(x) else x).str.zfill(5)
+        # missing['County Code'] = missing['County Code'].apply(lambda x: str(int(x)) if not pd.isna(x) else x).str.zfill(5)
+        missing['County Code'] = pd.to_numeric(missing['County Code'], errors='coerce').apply(lambda x: str(int(x)).zfill(5) if pd.notna(x) else np.nan)
         
         missing = missing[~missing['County Code'].isna()]
 
@@ -56,12 +57,9 @@ class gKNNImputer:
         cdc_df_drop = cdc_df.drop(columns=common_cols)
         merged_df1 = pd.merge(cdc_df_drop, new_missing, on='County Code', how='right')
         
-        # Remove duplicate County Code rows where Deaths_Per_100k is empty
-        duplicates = merged_df[merged_df.duplicated(subset=['County Code'], keep=False)]
-        to_drop = duplicates[duplicates['Deaths_per_100k'].isna()].index
-        merged_df = merged_df.drop(index=to_drop).reset_index(drop=True)
-
-        print(f"Merged CDC data shape after adding missing: {merged_df.shape}")
+        # Sort by Deaths_per_100k (valid values first), then drop duplicates keeping the first
+        merged_df = merged_df.sort_values(by='Deaths_per_100k', na_position='last')
+        merged_df = merged_df.drop_duplicates(subset=['County Code'], keep='first').reset_index(drop=True)
 
         
         return merged_df
@@ -133,7 +131,7 @@ class gKNNImputer:
         # Create CSV combining original df with imputed values
         # Sort the original dataframe by County Code to match the sorted imputed data
         combined_df = final_cdc_data_copy.copy()
-        combined_df['County Code'] = combined_df['County Code'].apply(lambda x: str(int(x)) if not pd.isna(x) else x).str.zfill(5)
+        combined_df['County Code'] = pd.to_numeric(combined_df['County Code'], errors='coerce').apply(lambda x: str(int(x)).zfill(5) if pd.notna(x) else np.nan)
         combined_df = combined_df.sort_values('County Code').reset_index(drop=True)
         
         # combined is already sorted by County Code and doesn't have County Code as a column
@@ -168,11 +166,11 @@ class gKNNImputer:
 
         df_cdc = df.copy()
         df_cdc = df_cdc[~df_cdc['County Code'].isna()].copy()
-        df_cdc['County Code'] = df_cdc['County Code'].apply(lambda x: str(int(x)) if not pd.isna(x) else x).str.zfill(5)
+        df_cdc['County Code'] = pd.to_numeric(df_cdc['County Code'], errors='coerce').apply(lambda x: str(int(x)).zfill(5) if pd.notna(x) else np.nan)
 
         # Merge with missing CDC data if applicable
         if not real_test:
-            missing_cdc = self.getMissingData('2010')
+            missing_cdc = self.getMissingData('2016')
             final_cdc_data = self.merge_cdc_missing(df_cdc, missing_cdc)
         else:
             final_cdc_data = df_cdc.copy()

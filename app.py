@@ -75,7 +75,8 @@ def get_merged_df(df):
     df1 = df.copy()
     df2 = pd.read_csv(csv_file_2)
 
-    df1 = df1[df1['Notes'].isna() | (df1['Notes'] == '')]
+    if 'Notes' in df1.columns:
+        df1 = df1[df1['Notes'].isna() | (df1['Notes'] == '')]
 
     print("First CSV file shape:", df1.shape)
     print("Second CSV file shape:", df2.shape)
@@ -338,7 +339,6 @@ async def impute_api(
         test_mask = cached["test_mask"]
         all_neighbor_map = cached.get("all_neighbor_map", {})
         downloadable_csv = cached.get("downloadable_csv")  # <-- NEW
-        print("Aitik: Using cached imputation result")
         imp_vals.to_csv(f"{algo}_imputed.csv", index=False)
     else:
         if algo == "mice":
