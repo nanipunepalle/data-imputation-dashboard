@@ -64,13 +64,16 @@ class KNNRegressorImputer:
         np.random.seed(self.random_state)
 
         # Create combined mask for specified columns (e.g., 'deaths_per_100k' and 'county code')
-        combined_mask = self.df[['Deaths_per_100k', 'County Code']]
+        if 'County Code' in self.df.columns:
+            combined_mask = self.df[self.cols + ['County Code']]
+        else:
+            combined_mask = self.df[self.cols]
         # Traverse combined_mask on column Deaths_per_100k
-        for idx, value in combined_mask['Deaths_per_100k'].items():
+        for idx, value in combined_mask[self.cols[0]].items():
             if pd.notna(value):
-                combined_mask.at[idx, 'Deaths_per_100k'] = False
+                combined_mask.at[idx, self.cols[0]] = False
             else:
-                combined_mask.at[idx, 'Deaths_per_100k'] = True
+                combined_mask.at[idx, self.cols[0]] = True
 
         for col in self.cols:
             non_null_indices = self.df[self.df[col].notna()].index
@@ -98,7 +101,7 @@ class KNNRegressorImputer:
 
         # Extract original and imputed values for:
         orig_values = original_series.dropna()
-        imputed_values_only = self.df.loc[combined_mask['Deaths_per_100k'], self.cols]
+        imputed_values_only = self.df.loc[combined_mask[self.cols[0]], self.cols]
         combined = self.df[self.cols].copy()
 
         # Extract only 20% evaluation mask values separately
