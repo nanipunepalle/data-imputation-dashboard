@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Radio, Select, InputNumber, Button, Progress } from 'antd';
 import ChartWrapper from '@/components/ChartWrapper';
 import styles from '@/styles/ImputationConfiguration.module.css';
@@ -16,7 +16,8 @@ import MissingnessSummaryChart from './MissingnessSummaryChart';
 import GeoMapModal from './GeoMapModal';
 
 const { Option } = Select;
-const algorithms = ['gKNN', 'MICE', 'Random Forest', 'XGBoost', 'KNN Regressor'];
+// const algorithms = ['gKNN', 'MICE', 'Random Forest', 'XGBoost', 'KNN Regressor'];
+const allAlgorithms = ['gKNN', 'MICE', 'Random Forest', 'XGBoost', 'KNN Regressor'];
 
 const algorithmDurations: Record<string, number> = {
     gKNN: 2000,
@@ -39,6 +40,32 @@ const ImputationConfiguration: React.FC = () => {
     const [imputationReady, setImputationReady] = useState(false); // ✅ controls Map visibility
 
     const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
+
+
+
+    const hasCountyCode = (() => {
+        if (!dataset) return false;
+
+        // If your dataset shape is { columns: string[]; data: ... }
+        if (Array.isArray(dataset.headers)) {
+            return dataset.headers.includes('County Code');
+        }
+
+        // If your dataset is an array of rows
+        if (Array.isArray(dataset) && dataset.length > 0) {
+            return 'County Code' in dataset[0];
+        }
+
+        return false;
+    })();
+
+    // 👇 Algorithms actually available for this dataset
+    const algorithmsToRender = useMemo(() => {
+        return hasCountyCode
+            ? allAlgorithms
+            : allAlgorithms.filter((algo) => algo !== 'gKNN');
+    }, [hasCountyCode]);
+
 
     // Load columns that have missingness
     useEffect(() => {
@@ -168,10 +195,21 @@ const ImputationConfiguration: React.FC = () => {
         >
             <div className={styles.container}>
                 <div className={styles.sidebar}>
-                    {algorithms.map((algo) => (
+                    {/* {algorithms.map((algo) => (
                         <div
                             key={algo}
                             className={`${styles.algorithm} ${selectedAlgorithm === algo ? styles.selected : ''}`}
+                            onClick={() => setSelectedAlgorithm(algo)}
+                        >
+                            {algo}
+                        </div>
+                    ))} */}
+
+                    {algorithmsToRender.map((algo) => (
+                        <div
+                            key={algo}
+                            className={`${styles.algorithm} ${selectedAlgorithm === algo ? styles.selected : ''
+                                }`}
                             onClick={() => setSelectedAlgorithm(algo)}
                         >
                             {algo}
