@@ -494,6 +494,11 @@ def get_test_evaluation(session_id: str = Query(...)):
     print(f"  Number of test samples: {len(merged)}")
     print(f"  MAE: {mae}")
     print(f"  RMSE: {rmse}")
+    # normalised rmse
+    # take mean of merged['original] and divide by it
+    mean_orig = merged['original'].mean()
+    rmse_norm = rmse / mean_orig
+    print(f"  Normalized RMSE: {rmse_norm}")
 
     return {
         "test_evaluation": merged.to_dict(orient="records"),
@@ -528,10 +533,10 @@ def get_scatter_plot_data(
     raw_df = session_store.get(session_id + "raw")
     merged_df = session_store.get(session_id)
 
-    if raw_df is not None:
-        original_df = raw_df
-    elif merged_df is not None:
+    if merged_df is not None:
         original_df = merged_df
+    elif raw_df is not None:
+        original_df = raw_df
     else:
         raise HTTPException(
             status_code=400,
