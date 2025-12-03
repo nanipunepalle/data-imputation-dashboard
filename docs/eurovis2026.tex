@@ -1,6 +1,6 @@
 % ---------------------------------------------------------------------------
 % EuroVis 2026 — Full Paper (Submission) using official EG template
-% Draft for "GeoImputeVis"
+% Draft for "ImputeVis"
 % ---------------------------------------------------------------------------
 
 \documentclass{egpubl}
@@ -43,7 +43,7 @@
 % ------- PDF metadata -------
 \hypersetup{
   pdftitle  ={GeoImputeVis: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors,},
-  pdfauthor ={Aitik Dandapat, Lalith Punepalle, Anirban Ghosh, Mithilesh Kumar Singh, Klaus Mueller}
+  pdfauthor ={Anonymous EuroVis 2026 submission}
 }
 
 % Acronym helper
@@ -53,18 +53,12 @@
 
 % ---------------------------------------------------------------------------
 
-	\title[ImputeVis]{ImputeVis: A Visual Analytics Dashboard for Diagnosing Missing Data and Comparing Imputation Methods}
+	\title[GeoImputeVis]{GeoImputeVis: A Visual Analytics Dashboard for Diagnosing Missing Data and Comparing Imputation Methods}
 
 %	\title[GeoImputeVis: Visual gKNN Analytics]{GeoImputeVis: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors}
 
 
-\author[A. Dandapat et al.]{
-  Aitik Dandapat\thanks{Computer Science, Stony Brook University, Stony Brook, New York, United States. Email: \texttt{adandapat@cs.stonybrook.edu}}
-  \quad Lalith Punepalle\thanks{Computer Science, Stony Brook University, Stony Brook, New York, United States. Email: \texttt{lpunepallera@cs.stonybrook.edu}}
-  \quad Anirban Ghosh\thanks{Computer Science, Stony Brook University, Stony Brook, New York, United States. Email: \texttt{anirban.ghosh@stonybrook.edu}} \\
-  Mithilesh Kumar Singh\thanks{Computer Science, Stony Brook University, Stony Brook, New York, United States. Email: \texttt{mkssingh@cs.stonybrook.edu}}
-  \quad Klaus Mueller\thanks{Computer Science, Stony Brook University, Stony Brook, New York, United States. Email: \texttt{mueller@cs.stonybrook.edu}}
-}
+\author[Anonymous]{Anonymous Submission}
 
 \begin{document}
 \maketitle
@@ -106,7 +100,7 @@ We review prior work in (i) spatial imputation for public health, (ii) visual an
 
 \paragraph*{Spatial imputation.} Methods for population-health imputation range from global regression to hierarchical Bayesian smoothing~\cite{Waller2016BayesianSmallArea}. Geographic KNN variants exploit adjacency and socio-economic stability~\cite{Lu2017SpatialKNN}. \gknn extends this family with socio-economic distance blending learned via Bayesian optimisation. \mice remains a standard for multivariate imputation~\cite{VanBuuren2018MICE}, while tree-based methods like Random Forest~\cite{Breiman2001RandomForest} and XGBoost~\cite{Chen2016XGBoost}, along with instance-based KNN~\cite{Cover1967KNN}, provide flexible non-linear alternatives. Our work adapts these algorithms to a unified backend with target-specific masking for evaluation.
 
-\paragraph*{Visual analytics for health data.} Systems such as Opioid Atlas~\cite{Ghosh2019OpioidAtlas} and HealthVis\cite{Carroll2014HealthVis} display surveillance data through coordinated views. Fewer works emphasise the imputation stage itself; notable exceptions include ViSUS for uncertainty exploration~\cite{Kwon2016DPMHU}, yet they often rely on precomputed imputations. \tool closes this gap by integrating algorithm execution and diagnostic visualization.
+\paragraph*{Visual analytics for health data.} Systems such as Opioid Atlas~\cite{Ghosh2019OpioidAtlas} and HealthVis\cite{Carroll2014HealthVis} display surveillance data through coordinated views. Fewer works emphasise the imputation stage itself; notable exceptions include ViSUS for uncertainty exploration~\cite{Kwon2016DPMHU} and evaluations of missing data visualization techniques~\cite{SongSzafir2018}, yet they often rely on precomputed imputations. \tool closes this gap by integrating algorithm execution and diagnostic visualization, following the paradigm of integrating machine learning with visual analytics~\cite{Endert2017}.
 
 \paragraph*{Uncertainty communication.} Conveying imputation uncertainty remains challenging~\cite{Hullman2019Uncertainty}. Techniques include ensemble glyphs~\cite{Potter2012Ensemble} and interval encoding~\cite{Hullman2015Hypothetical}. We align with guidance on differentiating observed versus imputed values~\cite{Correll2018Considerations}, employing colour encodings and tooltips that reveal donor counties and metric confidence.
 
@@ -125,7 +119,7 @@ We compute additional covariates to support \tool's algorithms:
 \end{itemize}
 
 \subsection{Missingness mechanism}
-The missingness is not MCAR: suppressed counties tend to be low-population and belong to neighbouring clusters, triggering spatial dependence. This motivates algorithms that leverage geographic proximity and demographic similarity, justifying the inclusion of \gknn alongside baseline chained-equations (\mice) and the XGBoost, Random Forest, and KNN benchmarks.
+The missingness is not MCAR~\cite{LittleRubin2019}: suppressed counties tend to be low-population and belong to neighbouring clusters, triggering spatial dependence. This motivates algorithms that leverage geographic proximity and demographic similarity, justifying the inclusion of \gknn alongside baseline chained-equations (\mice) and the XGBoost, Random Forest, and KNN benchmarks.
 
 % ---------------------------------------------------------------------------
 \section{Methodology and System Design}
@@ -149,7 +143,7 @@ The canonical workflow, derived from contextual inquiry with Stony Brook Univers
   \item \textbf{Missingness Diagnosis.} The dashboard generates a missingness summary, highlighting columns with missing values (NaNs). Analysts review these statistics to identify potential target variables for imputation and assess the extent of data suppression.
   \item \textbf{Pre-Imputation Visualization.} To understand the mechanism of missingness, users explore pre-imputation plots that visualize the distribution of missing values against other attributes. This helps in identifying systematic patterns or correlations that might inform model selection.
   \item \textbf{Algorithm Configuration and Execution.} Users select an imputation strategy (e.g., \gknn, \mice, XGBoost) and tune hyperparameters such as the number of neighbors or iterations. The configuration panel allows for precise control before triggering the imputation process on the selected target column.
-  \item \textbf{Distributional Comparison.} Post-imputation, the system displays comparative histograms showing the spread of imputed values versus the original observed values. This visual check ensures that the imputed distribution aligns with domain expectations and does not introduce artifacts.
+  \item \textbf{Distributional Comparison.} Post-imputation, the system displays comparative histograms~\cite{Gleicher2011} showing the spread of imputed values versus the original observed values. This visual check ensures that the imputed distribution aligns with domain expectations and does not introduce artifacts.
   \item \textbf{Bivariate Analysis.} Scatterplots allow analysts to examine the relationship between imputed values and other covariates ("Rest vs Imputed"). This step is crucial for verifying that multivariate relationships are preserved and that imputed points do not form implausible clusters.
   \item \textbf{Validation and Error Analysis.} Finally, the validation panel reports quantitative metrics. Users can observe the absolute difference for randomly sampled holdout data to gauge algorithm performance at a granular level, alongside aggregate metrics like RMSE and MAE.
 \end{enumerate}
@@ -240,14 +234,15 @@ The UI exposes MAE, RMSE, sample counts, and Wilcoxon statistics once imputation
 \label{sec:case}
 We collaborated with public-health analysts in New York to evaluate \tool. Each case study involved uploading county overdose data, selecting targets (overdose rate, deaths per 100k), and investigating algorithm outputs.
 
-\begin{figure}[tb]
+\begin{figure*}[tb]
   \centering
   \includegraphics[width=\linewidth]{GeoMap.png}
   \\[1ex]
-  \includegraphics[width=\linewidth]{Imputed_County.png}
-  \caption{Case Study: (Top) The GeoMap highlights the target imputed county and its donors (navy) with opacity indicating contribution weight. (Bottom) Detailed textual breakdown of the imputation, showing the exact values and weights of the donor counties.}
+  % \includegraphics[width=\linewidth]{Imputed_County.png}
+  \caption{Case Study: The GeoMap highlights the target imputed county and its donors (navy) with opacity indicating contribution weight.}
+  % (Bottom) Detailed textual breakdown of the imputation, showing the exact values and weights of the donor counties.
   \label{fig:case_study}
-\end{figure}
+\end{figure*}
 
 \subsection{Rural county suppression}
 Analysts imputed suppressed rates for low-population rural counties. \gknn highlighted geographically contiguous donors and the modal emphasised spillover from adjacent counties sharing socio-economic profiles. Although \mice produced slightly lower RMSE (2.8 deaths/100k), analysts favoured \gknn when communicating with stakeholders because the donor map aligned with known referral networks.
@@ -321,7 +316,7 @@ While the dual-gradient map was initially challenging for P1, they quickly adapt
 % ---------------------------------------------------------------------------
 \section{Discussion}
 \label{sec:discussion}
-\tool bridges the gap between advanced imputation models and interpretable, actionable analytics. Critical design lessons include: (i) preserving algorithm provenance---the UI must reveal why specific donors influence imputations; (ii) aligning visual encodings with epidemiological terminology; and (iii) supporting offline workflows via CSV export.
+\tool bridges the gap between advanced imputation models and interpretable, actionable analytics. Critical design lessons include: (i) preserving algorithm provenance~\cite{Ragan2016}---the UI must reveal why specific donors influence imputations; (ii) aligning visual encodings with epidemiological terminology; and (iii) supporting offline workflows via CSV export.
 
 Limitations include reliance on county-level socio-economic covariates, which may lag in availability; future versions could ingest hospital admissions or EMS data. Memory constraints of in-browser rendering limit data size, though county-level datasets remain tractable.
 
@@ -380,6 +375,21 @@ Looking ahead, we plan to broaden validation with additional states, tribal regi
 
 \bibitem{Correll2018Considerations}
 \textsc{Correll, M., Gleicher, M.}: Considerations for Visualizing Missing Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 24(1): 453--462, 2018.
+
+\bibitem{LittleRubin2019}
+\textsc{Little, R. J., Rubin, D. B.}: \emph{Statistical Analysis with Missing Data}, 3rd edn. Wiley, 2019.
+
+\bibitem{SongSzafir2018}
+\textsc{Song, H., Szafir, D. A.}: Where's My Data? Evaluating Visualizations of Missing Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 25(1):914--924, 2019.
+
+\bibitem{Ragan2016}
+\textsc{Ragan, E. D., et al.}: Characterizing Provenance in Visualization and Data Analysis: An Organizational Framework of Analytic Approaches. \emph{IEEE Transactions on Visualization and Computer Graphics} 22(1):31--40, 2016.
+
+\bibitem{Endert2017}
+\textsc{Endert, A., et al.}: The State of the Art in Integrating Machine Learning into Visual Analytics. \emph{Computer Graphics Forum} 36(8):458--486, 2017.
+
+\bibitem{Gleicher2011}
+\textsc{Gleicher, M., et al.}: Visual Comparison for Information Visualization. \emph{Information Visualization} 10(4):289--309, 2011.
 
 \end{thebibliography}
 
