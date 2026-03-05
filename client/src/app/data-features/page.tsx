@@ -8,7 +8,7 @@ import { useDatasetStore } from '@/store/useDataStore';
 import MissingnessSummaryChart from '@/components/MissingnessSummaryChart';
 import ImputationConfiguration from '@/components/ImputationConfiguration';
 import HistogramImputation from '@/components/ImputationDistributionHistogramChart';
-import AbsoluteDifferenceHistogram from '@/components/AbsoluteDifferenceHistogramChart';
+import MethodComparisonTable from '@/components/MethodComparisonTable';
 import ImputedScatterPlot from '@/components/ImputedScatterChart';
 import { HourglassOutlined } from '@ant-design/icons';
 import { Dataset } from '@/types';
@@ -82,7 +82,7 @@ const DataFeatures: React.FC = () => {
           </div>
 
           <div className={`${styles.columnBox} ${styles.halfHeight}`}>
-            <AbsoluteDifferenceHistogram />
+            <MethodComparisonTable />
           </div>
         </div>
       </Col>

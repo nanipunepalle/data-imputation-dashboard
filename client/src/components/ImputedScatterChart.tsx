@@ -10,7 +10,7 @@ import { fetchDataTypes, fetchMissingnessSummary, fetchScatterPlotData } from '@
 const { Text } = Typography;
 
 const ImputedScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
-    const { dataset, isUpdated } = useDatasetStore();
+    const { dataset, isUpdated, chartsReset } = useDatasetStore();
     const svgRef = useRef<SVGSVGElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -98,6 +98,14 @@ const ImputedScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
             cancelled = true;
         };
     }, [xColumn, yColumn, dataset, isUpdated]);
+
+    // Reset chart when chartsReset state changes
+    useEffect(() => {
+        if (svgRef.current) {
+            const svg = d3.select(svgRef.current);
+            svg.selectAll('*').remove();
+        }
+    }, [chartsReset]);
 
     const drawScatter = (points: any[], xKey: string, yKey: string) => {
         const svg = d3.select(svgRef.current);

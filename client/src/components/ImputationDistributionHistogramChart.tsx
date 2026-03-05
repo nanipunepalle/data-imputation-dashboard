@@ -8,7 +8,7 @@ import ChartWrapper from '@/components/ChartWrapper';
 import { useDatasetStore } from '@/store/useDataStore';
 
 const ImputationDistributionHistogramChart: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
-    const { dataset, isUpdated } = useDatasetStore();
+    const { dataset, isUpdated, chartsReset } = useDatasetStore();
     const svgRef = useRef<SVGSVGElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [columns, setColumns] = useState<string[]>([]);
@@ -34,6 +34,14 @@ const ImputationDistributionHistogramChart: React.FC<{ inModal?: boolean }> = ({
             })
             .catch(() => setLoading(false));
     }, [selectedColumn, dataset, isUpdated]);
+
+    // Reset chart when chartsReset state changes
+    useEffect(() => {
+        if (svgRef.current) {
+            const svg = d3.select(svgRef.current);
+            svg.selectAll('*').remove();
+        }
+    }, [chartsReset]);
 
     const drawHistogram = (original: number[], imputed: number[]) => {
         const svg = d3.select(svgRef.current);

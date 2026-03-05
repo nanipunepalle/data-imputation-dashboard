@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from fastapi import FastAPI, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
@@ -43,6 +44,9 @@ session_store: Dict[str, pd.DataFrame] = {}
 
 # Store original, imputed, and combined datasets per session
 imputation_store: Dict[str, Dict[str, pd.DataFrame]] = {}
+
+# Store algorithm comparison table per session
+comparison_table_store: Dict[str, list] = {}
 
 label_encoders: Dict[str, Dict[str, object]] = {}
 
@@ -93,7 +97,7 @@ def get_merged_df(df):
     # Convert 'County Code' to integer, handling errors if any
     merged_df['County Code'] = pd.to_numeric(merged_df['County Code'], errors='coerce').astype('Int64')
 
-    merged_df.to_csv('merged_debug.csv', index=False)
+    # merged_df.to_csv('merged_debug.csv', index=False)
     print("Merged DataFrame shape:", merged_df.shape)
     
     # Reset index to avoid length mismatch errors
@@ -344,8 +348,11 @@ async def impute_api(
         test_mask = cached["test_mask"]
         all_neighbor_map = cached.get("all_neighbor_map", {})
         downloadable_csv = cached.get("downloadable_csv")  # <-- NEW
-        imp_vals.to_csv(f"{algo}_imputed.csv", index=False)
+        # imp_vals.to_csv(f"{algo}_imputed.csv", index=False)
     else:
+        # Start runtime tracking
+        start_time = time.time()
+        
         if algo == "mice":
             imputer = MiceImputer(df.copy(), columns, max_iter=iterations)
         elif algo == "bart":
@@ -374,8 +381,58 @@ async def impute_api(
             downloadable_csv,
             all_neighbor_map,
         ) = imputer.impute()
+        
+        # Calculate runtime
+        end_time = time.time()
+        runtime_seconds = end_time - start_time
 
-        # Store in cache (include downloadable_csv here!)
+        # Compute summary metrics for caching
+        test_orig_flat = test_orig.stack().reset_index()
+        test_imp_flat = test_imp.stack().reset_index()
+        test_orig_flat.columns = ["index", "column", "original"]
+        test_imp_flat.columns = ["index", "column", "imputed"]
+        merged_eval = pd.merge(test_orig_flat, test_imp_flat, on=["index", "column"])
+        merged_eval["absolute_diff"] = (merged_eval["original"] - merged_eval["imputed"]).abs()
+        diff = merged_eval["original"] - merged_eval["imputed"]
+        merged_eval["squared_diff"] = diff ** 2
+        
+        mae = float(merged_eval["absolute_diff"].mean())
+        rmse = float(np.sqrt(merged_eval["squared_diff"].mean()))
+        mean_orig = merged_eval['original'].mean()
+        rmse_norm = rmse / mean_orig if mean_orig != 0 else 0.0
+        
+        summary_metrics = {
+            "mean_abs_diff": float(merged_eval["absolute_diff"].mean()),
+            "median_abs_diff": float(merged_eval["absolute_diff"].median()),
+            "std_abs_diff": float(merged_eval["absolute_diff"].std()),
+            "mae": mae,
+            "rmse": rmse,
+            "rmse_normalized": rmse_norm,
+            "sample_count": len(merged_eval),
+            "runtime_seconds": runtime_seconds,
+        }
+
+        # Update comparison table for this session
+        if session_id not in comparison_table_store:
+            comparison_table_store[session_id] = []
+        
+        # Check if this algorithm already exists in the comparison table
+        existing_entry = next((entry for entry in comparison_table_store[session_id] if entry["algorithm"] == algo), None)
+        if existing_entry:
+            # Update existing entry
+            existing_entry["mae"] = mae
+            existing_entry["rmse"] = rmse
+            existing_entry["runtime_seconds"] = runtime_seconds
+        else:
+            # Append new entry
+            comparison_table_store[session_id].append({
+                "algorithm": algo,
+                "mae": mae,
+                "rmse": rmse,
+                "runtime_seconds": runtime_seconds,
+            })
+
+        # Store in cache (include downloadable_csv and summary_metrics!)
         imputation_store[cache_key] = {
             "original": orig_vals,
             "imputed": imp_vals,
@@ -385,7 +442,8 @@ async def impute_api(
             "test_imp": test_imp,
             "test_mask": test_mask,
             "all_neighbor_map": all_neighbor_map,
-            "downloadable_csv": downloadable_csv,  # <-- NEW
+            "downloadable_csv": downloadable_csv,
+            "summary_metrics": summary_metrics,  # <-- NEW
         }
 
     # Save imputed components separately for this session
@@ -399,6 +457,7 @@ async def impute_api(
         "test_mask": test_mask,
         "all_neighbor_map": all_neighbor_map,
         "downloadable_csv": downloadable_csv,  # now always defined
+        "summary_metrics": imputation_store[cache_key].get("summary_metrics", {}),  # <-- NEW
     }
 
     return {
@@ -473,6 +532,7 @@ def get_test_evaluation(session_id: str = Query(...)):
 
     test_orig = imputation_store[session_id].get("test_orig")
     test_imp = imputation_store[session_id].get("test_imp")
+    summary_metrics = imputation_store[session_id].get("summary_metrics", {})
 
     if test_orig is None or test_imp is None:
         raise HTTPException(status_code=404, detail="Test evaluation data not found.")
@@ -489,15 +549,22 @@ def get_test_evaluation(session_id: str = Query(...)):
     diff = merged["original"] - merged["imputed"]
     merged["squared_diff"] = diff ** 2
 
-    mae = float(merged["absolute_diff"].mean())          # Mean Absolute Error
-    rmse = float(np.sqrt(merged["squared_diff"].mean())) # Root Mean Squared Error
+    # Use cached summary if available, otherwise compute
+    if summary_metrics:
+        return {
+            "test_evaluation": merged.to_dict(orient="records"),
+            "column_list": merged["column"].unique().tolist(),
+            "summary": summary_metrics,
+        }
+    
+    # Fallback: compute if not cached
+    mae = float(merged["absolute_diff"].mean())
+    rmse = float(np.sqrt(merged["squared_diff"].mean()))
     print(f"  Number of test samples: {len(merged)}")
     print(f"  MAE: {mae}")
     print(f"  RMSE: {rmse}")
-    # normalised rmse
-    # take mean of merged['original] and divide by it
     mean_orig = merged['original'].mean()
-    rmse_norm = rmse / mean_orig
+    rmse_norm = rmse / mean_orig if mean_orig != 0 else 0.0
     print(f"  Normalized RMSE: {rmse_norm}")
 
     return {
@@ -509,8 +576,41 @@ def get_test_evaluation(session_id: str = Query(...)):
             "std_abs_diff": merged["absolute_diff"].std(),
             "mae": mae,
             "rmse": rmse,
+            "rmse_normalized": rmse_norm,
         }
     }
+
+
+@app.get("/dataframe/summary_metrics")
+def get_summary_metrics(session_id: str = Query(...)):
+    """
+    Returns cached summary metrics (MAE, RMSE, etc.) for the session.
+    Instant retrieval without recalculation.
+    """
+    if session_id not in imputation_store:
+        raise HTTPException(
+            status_code=400, detail="No imputation data for this session."
+        )
+
+    summary_metrics = imputation_store[session_id].get("summary_metrics")
+    if summary_metrics is None:
+        raise HTTPException(
+            status_code=404, detail="Summary metrics not found for this session."
+        )
+
+    return {"summary": summary_metrics}
+
+
+@app.get("/dataframe/comparison_table")
+def get_comparison_table(session_id: str = Query(...)):
+    """
+    Returns the persistent algorithm comparison table for the session.
+    Shows Algorithm, MAE, RMSE for all executed algorithms.
+    """
+    if session_id not in comparison_table_store:
+        return {"comparison_data": []}
+    
+    return {"comparison_data": comparison_table_store[session_id]}
 
 
 @app.get("/dataframe/scatter_plot_data")
