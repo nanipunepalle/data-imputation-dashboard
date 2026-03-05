@@ -29,7 +29,7 @@ const algorithmDurations: Record<string, number> = {
 };
 
 const ImputationConfiguration: React.FC = () => {
-    const { dataset, setUpdated, isUpdated } = useDatasetStore();
+    const { dataset, setUpdated, isUpdated, resetCharts, selectedAlgorithm: storeSelectedAlgorithm, setSelectedAlgorithm: setStoreSelectedAlgorithm } = useDatasetStore();
     const [selectedAlgorithm, setSelectedAlgorithm] = useState('MICE');
     const [type, setType] = useState<'Single' | 'Multiple'>('Single');
     const [target, setTarget] = useState<string | string[] | undefined>();
@@ -108,10 +108,24 @@ const ImputationConfiguration: React.FC = () => {
         }
     }, [columns, type]);
 
+    // Listen to algorithm selection from store (e.g., from Method Comparison Table click)
+    useEffect(() => {
+        if (storeSelectedAlgorithm && storeSelectedAlgorithm !== selectedAlgorithm) {
+            setSelectedAlgorithm(storeSelectedAlgorithm);
+            // Clear the store value after applying it
+            setStoreSelectedAlgorithm('');
+        }
+    }, [storeSelectedAlgorithm]);
+
     // Check imputation status whenever inputs change
     useEffect(() => {
         checkImputationStatus();
     }, [dataset, columns, selectedAlgorithm, target, maxIteration, sessionId, isUpdated]);
+
+    // Automatically fetch cached data when algorithm changes and cache is available
+    useEffect(() => {
+        fetchCachedDataIfAvailable();
+    }, [selectedAlgorithm, target, maxIteration, sessionId]);
 
     const checkImputationStatus = async () => {
         // Reset to false by default
@@ -140,6 +154,50 @@ const ImputationConfiguration: React.FC = () => {
             setImputationReady(!!ready);
         } catch (e) {
             console.error('fetchImputationStatus failed:', e);
+            setImputationReady(false);
+        }
+    };
+
+    const fetchCachedDataIfAvailable = async () => {
+        if (!target || !maxIteration || !sessionId) return;
+
+        const selectedColumns = Array.isArray(target) ? target : [target];
+
+        try {
+            // Check if cache exists
+            const statusResp = await fetchImputationStatus({
+                algo: selectedAlgorithm,
+                columns: selectedColumns,
+                iterations: maxIteration,
+            });
+
+            const cacheExists =
+                statusResp === true ||
+                statusResp?.done === true ||
+                statusResp?.isDone === true ||
+                (typeof statusResp?.status === 'string' && statusResp.status.toLowerCase() === 'done');
+
+            if (cacheExists) {
+                // Fetch the cached imputation data
+                const response = await runImputation({
+                    algo: selectedAlgorithm,
+                    columns: selectedColumns,
+                    iterations: maxIteration,
+                });
+
+                console.log('Fetched cached data:', response);
+                setUpdated(!isUpdated);
+                setImputationReady(true);
+            } else {
+                // No cached data found - reset the charts to initial state
+                console.log('No cached data found, resetting charts');
+                resetCharts();
+                setImputationReady(false);
+            }
+        } catch (error) {
+            console.error('Error fetching cached data:', error);
+            // Reset charts on error as well
+            resetCharts();
             setImputationReady(false);
         }
     };
@@ -210,7 +268,11 @@ const ImputationConfiguration: React.FC = () => {
                             key={algo}
                             className={`${styles.algorithm} ${selectedAlgorithm === algo ? styles.selected : ''
                                 }`}
-                            onClick={() => setSelectedAlgorithm(algo)}
+                            onClick={() => {
+                                setSelectedAlgorithm(algo);
+                                // Reset imputation ready state when changing algorithm
+                                setImputationReady(false);
+                            }}
                         >
                             {algo}
                         </div>

@@ -10,7 +10,7 @@ from customLabelEncoder import CustomLabelEncoder
 class MiceImputer:
     def __init__(self, df, cols, max_iter=25, random_state=42, treat_none_as_category=False):
         self.df = df.copy()
-        self.df.to_csv("original.csv", index=False)
+        # self.df.to_csv("original.csv", index=False)
         self.cols = cols
         self.max_iter = max_iter
         self.random_state = random_state

@@ -11,6 +11,8 @@ interface DatasetState {
   isUploaded: boolean;
   error: string | null;
   isUpdated: boolean
+  chartsReset: boolean;
+  selectedAlgorithm: string | null;
 
   setDataset: (data: Dataset) => void;
   setTargetColumn: (column: string | null) => void;
@@ -20,6 +22,8 @@ interface DatasetState {
   setIsUploaded: (flag: boolean) => void;
   setError: (err: string | null) => void;
   setUpdated: (flag: boolean) => void
+  resetCharts: () => void;
+  setSelectedAlgorithm: (algo: string) => void;
 }
 
 export const useDatasetStore = create<DatasetState>((set) => ({
@@ -31,6 +35,8 @@ export const useDatasetStore = create<DatasetState>((set) => ({
   isUploaded: false,
   error: null,
   isUpdated: false,
+  chartsReset: false,
+  selectedAlgorithm: null,
 
   setDataset: (dataset) => set({ dataset }),
   setTargetColumn: (targetColumn) => set({ targetColumn }),
@@ -39,5 +45,7 @@ export const useDatasetStore = create<DatasetState>((set) => ({
   setUploadedFile: (uploadedFile) => set({ uploadedFile }),
   setIsUploaded: (isUploaded) => set({ isUploaded }),
   setError: (error) => set({ error }),
-  setUpdated: (isUpdated) => set({ isUpdated })
+  setUpdated: (isUpdated) => set({ isUpdated }),
+  resetCharts: () => set((state) => ({ chartsReset: !state.chartsReset })),
+  setSelectedAlgorithm: (selectedAlgorithm) => set({ selectedAlgorithm }),
 }));

@@ -8,7 +8,7 @@ import { useDatasetStore } from '@/store/useDataStore';
 import { fetchMissingnessSummary, fetchTestEvaluation } from '@/services/apiService';
 
 const AbsoluteDifferenceHistogram: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
-  const { dataset, isUpdated } = useDatasetStore();
+  const { dataset, isUpdated, chartsReset } = useDatasetStore();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
@@ -56,6 +56,14 @@ const AbsoluteDifferenceHistogram: React.FC<{ inModal?: boolean }> = ({ inModal 
       })
       .catch(() => setLoading(false));
   }, [selectedColumn, dataset, isUpdated]);
+
+  // Reset chart when chartsReset state changes
+  useEffect(() => {
+    if (svgRef.current) {
+      const svg = d3.select(svgRef.current);
+      svg.selectAll('*').remove();
+    }
+  }, [chartsReset]);
 
   const drawHistogram = (values: number[], mae?: number, rmse?: number) => {
     const svg = d3.select(svgRef.current);

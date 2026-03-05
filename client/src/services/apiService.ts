@@ -330,3 +330,19 @@ export async function fetchNeighborMap() {
   return data.neighbor_map as Record<string, any>;
 }
 
+// --- Comparison Table --------------------------------------------------------
+export async function fetchComparisonTable() {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dataframe/comparison_table`, {
+      params: {
+        session_id: getSessionId(),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching comparison table:', error);
+    throw error;
+  }
+}
+
+
