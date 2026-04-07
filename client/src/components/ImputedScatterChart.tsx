@@ -9,10 +9,16 @@ import { fetchDataTypes, fetchMissingnessSummary, fetchScatterPlotData } from '@
 
 const { Text } = Typography;
 
+type Domain2D = {
+    xDomain: [number, number];
+    yDomain: [number, number];
+};
+
 const ImputedScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
     const { dataset, isUpdated, chartsReset } = useDatasetStore();
     const svgRef = useRef<SVGSVGElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const domainLockRef = useRef<Record<string, Domain2D>>({});
 
     const [columns, setColumns] = useState<string[]>([]);
     const [imputedColumns, setImputedColumns] = useState<string[]>([]);
@@ -105,30 +111,54 @@ const ImputedScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
             const svg = d3.select(svgRef.current);
             svg.selectAll('*').remove();
         }
+        domainLockRef.current = {};
     }, [chartsReset]);
+
+    // Reset locked domains for newly uploaded datasets.
+    useEffect(() => {
+        domainLockRef.current = {};
+    }, [dataset]);
+
+    const sanitizeDomain = (domain: [number, number]): [number, number] => {
+        const [min, max] = domain;
+        if (min === max) {
+            const padding = min === 0 ? 1 : Math.abs(min) * 0.05;
+            return [min - padding, max + padding];
+        }
+        return domain;
+    };
 
     const drawScatter = (points: any[], xKey: string, yKey: string) => {
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove();
 
-        const containerWidth = containerRef.current!.clientWidth || 600;
-        const containerHeight = containerRef.current!.clientHeight || 360;
-        const width = containerWidth;
-        const height = containerHeight;
+        const containerWidth = containerRef.current!.clientWidth;
+        const containerHeight = containerRef.current!.clientHeight;
+        const width = Math.max(320, containerWidth || 0);
+        const height = Math.max(inModal ? 320 : 240, containerHeight || 0);
 
         const margin = { top: 10, right: 30, bottom: 60, left: 60 };
 
         const xExtent = d3.extent(points, (d: any) => d.x) as [number, number] | [undefined, undefined];
         const yExtent = d3.extent(points, (d: any) => d.y) as [number, number] | [undefined, undefined];
 
-        const xDomain: [number, number] = [
+        const nextXDomain: [number, number] = [
             xExtent[0] ?? 0,
             xExtent[1] ?? 1,
         ];
-        const yDomain: [number, number] = [
+        const nextYDomain: [number, number] = [
             yExtent[0] ?? 0,
             yExtent[1] ?? 1,
         ];
+
+        const domainKey = `${xKey}__${yKey}`;
+        const lockedDomain = domainLockRef.current[domainKey];
+        const xDomain = sanitizeDomain(lockedDomain?.xDomain ?? nextXDomain);
+        const yDomain = sanitizeDomain(lockedDomain?.yDomain ?? nextYDomain);
+
+        if (!lockedDomain) {
+            domainLockRef.current[domainKey] = { xDomain, yDomain };
+        }
 
         const x = d3.scaleLinear().domain(xDomain).nice().range([margin.left, width - margin.right]);
         const y = d3.scaleLinear().domain(yDomain).nice().range([height - margin.bottom, margin.top]);
@@ -250,7 +280,7 @@ const ImputedScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
                     </Select>
                 </div>
             </div>
-            <div ref={containerRef} style={{ flex: 1 }}>
+            <div ref={containerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                 <Spin spinning={loading}>
                     <svg ref={svgRef} width="100%" height="100%" />
                 </Spin>

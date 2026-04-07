@@ -103,8 +103,10 @@ const PreImputeScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const width = containerRef.current.clientWidth || 600;
-    const height = containerRef.current.clientHeight || (inModal ? 320 : 420);
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+    const width = Math.max(320, containerWidth || 0);
+    const height = Math.max(inModal ? 320 : 240, containerHeight || 0);
     const margin = { top: 10, right: 16, bottom: 56, left: 64 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
@@ -280,7 +282,7 @@ const PreImputeScatterPlot: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
         </div>
       </div>
 
-      <div ref={containerRef} style={{ flex: 1 }}>
+      <div ref={containerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <Spin spinning={loading}>
           <svg ref={svgRef} width="100%" height="100%" />
         </Spin>

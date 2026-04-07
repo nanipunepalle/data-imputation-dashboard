@@ -1,0 +1,32 @@
+.algorithmCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activeDot {
+  width: 12px;
+  display: inline-block;
+  color: #1890ff;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(-0.5px);
+  transition: opacity 120ms ease;
+}
+
+.activeDotVisible {
+  opacity: 1;
+}
+
+.algorithmLink {
+  font-weight: 600;
+  text-transform: capitalize;
+  color: #1890ff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.activeRow td {
+  background: rgba(24, 144, 255, 0.08) !important;
+}
+
