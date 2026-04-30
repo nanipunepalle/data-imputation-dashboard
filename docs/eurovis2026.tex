@@ -1,6 +1,6 @@
 % ---------------------------------------------------------------------------
 % EuroVis 2026 — Full Paper (Submission) using official EG template
-% Draft for "ImputeVis"
+% Draft for "ImputeViz"
 % ---------------------------------------------------------------------------
 
 \documentclass{egpubl}
@@ -39,23 +39,23 @@
 \usepackage{xspace}
 \usepackage{enumitem}
 \usepackage{multirow}
+\usepackage[colorinlistoftodos,prependcaption,textsize=small]{todonotes}
+\usepackage{float}
 
 % ------- PDF metadata -------
 \hypersetup{
-  pdftitle  ={GeoImputeVis: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors,},
+  pdftitle  ={ImputeViz: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors,},
   pdfauthor ={Anonymous EuroVis 2026 submission}
 }
 
 % Acronym helper
 \newcommand{\gknn}{gKNN\xspace}
 \newcommand{\mice}{MICE\xspace}
-\newcommand{\tool}{ImputeVis\xspace}
+\newcommand{\tool}{ImputeViz\xspace}
 
 % ---------------------------------------------------------------------------
 
-	\title[GeoImputeVis]{GeoImputeVis: A Visual Analytics Dashboard for Diagnosing Missing Data and Comparing Imputation Methods}
-
-%	\title[GeoImputeVis: Visual gKNN Analytics]{GeoImputeVis: Interactive Imputation of Missing Spatio-temporal Data Using Geographic k-Nearest Neighbors}
+	\title[ImputeViz]{ImputeViz: A Visual Analytics Dashboard for Diagnosing Missing Data and Comparing Imputation Methods}
 
 
 \author[Anonymous]{Anonymous Submission}
@@ -65,26 +65,108 @@
 
 % ---------------------------------------------------------------------------
 \begin{abstract}
-Missing data is a fundamental challenge across scientific, social-science, and public-health datasets, often distorting downstream analyses when left untreated or improperly imputed. We present ImputeVis, a visual analytics dashboard designed to support the full workflow of missing-data diagnosis, model selection, and imputation evaluation. ImputeVis integrates a suite of widely used imputation approaches—including MICE, XGBoost, Random Forest, KNN, and a new method that incorporates geospatial relationships—within a task-driven interface that helps users understand both missingness mechanisms and model behavior. The system provides coordinated views for exploring missingness structure using heatmaps, co-missingness patterns, and distributional summaries that reveal potential missingness mechanisms such as MCAR, MAR, or MNAR. After selecting or tuning an imputation model, users can examine imputed values through distributional comparisons, reconstruction error metrics, and variable-level diagnostics across different methods. Case studies illustrate how ImputeVis helps analysts select appropriate imputation strategies, identify sensitive variables, and assess model robustness. By coupling rich missingness diagnostics with interpretable visual evaluation of imputation outcomes, ImputeVis offers a unified framework for improving data quality and transparency in analytical workflows.
+Missing data is a persistent obstacle in scientific, social science, and public health research, often distorting or biasing analytical outcomes and placing significant accountability on analysts for how missing values are imputed. We introduce ImputeViz, an integrated visual analytics dashboard that supports the workflow of diagnosing missingness, selecting imputation models, and evaluating their outputs. The system brings together widely used methods—including MICE, Random Forest, XGBoost, and kNN—within a task-driven environment that makes missingness visible rather than merely statistical. To support geospatial reasoning, we also introduce gKNN, a geographically informed kNN variant that blends socio-economic and spatial distances. While gKNN is a pragmatic algorithmic contribution tailored to county-level public health data, the primary novelty of this work lies in the method-agnostic, provenance-rich visual analytics environment that hosts it. Coordinated views reveal missingness structure through heatmaps, co-missingness matrices, and distributional diagnostics that help analysts infer mechanisms such as MCAR, MAR, or MNAR. Users can compare and tune models and interrogate results via distributional overlays, a \emph{Method Comparison Summary} that reports MAE, RMSE, $\Delta$RMSE (gap to the best RMSE among executed runs), and runtime for every algorithm on the current target and mask, and variable-level discrepancy views. Cached per-method results and locked axis scales on the post-imputation plots reduce the need to mentally reconcile shifting ranges when switching algorithms. These visual comparisons show where models diverge, which variables are fragile, and how imputation choices reshape downstream analyses. Case studies demonstrate how ImputeViz helps analysts select effective strategies, surface sensitive variables, and assess model robustness.
+
+%By coupling rich missingness diagnostics with interpretable visual evaluation of imputation outcomes, 
+%ImputeViz offers a unified framework for improving data quality and strengthening transparency in analytical workflows.
+
+%last removed: The system brings together widely used methods—including MICE, Random Forest, XGBoost, KNN, and gKNN, a new technique that incorporates geospatial structure—within a task-driven environment that makes missingness visible rather than merely statistical. Coordinated views reveal missingness structure through heatmaps, co-missingness matrices, and distributional diagnostics that help analysts infer mechanisms such as MCAR, MAR, or MNAR.
+
+
+%Missing data is a fundamental challenge across scientific, social science, and public health datasets, often distorting downstream analyses when left untreated or improperly imputed. We present ImputeViz, a visual analytics dashboard designed to support the full workflow of missing data diagnosis, model selection, and imputation evaluation. ImputeViz integrates a suite of widely used imputation approaches—including MICE, XGBoost, Random Forest, KNN, and gKNN, a new method that incorporates geospatial relationships—within a task-driven interface that helps users understand both missingness mechanisms and model behavior. The system provides coordinated views for exploring missingness structure using heatmaps, co-missingness patterns, and distributional summaries that reveal potential missingness mechanisms such as MCAR, MAR, or MNAR. After selecting or tuning an imputation model, users can examine imputed values through distributional comparisons, reconstruction error metrics, and variable-level diagnostics across different methods. Case studies illustrate how ImputeViz helps analysts select appropriate imputation strategies, identify sensitive variables, and assess model robustness. By coupling rich missingness diagnostics with interpretable visual evaluation of imputation outcomes, ImputeViz offers a unified framework for improving data quality and transparency in analytical workflows.
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10003120.10003145.10003147.10010365</concept_id>
+<concept_desc>Human-centered computing~Visual analytics</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Human-centered computing~Visual analytics}
+
+\printccsdesc 
+
 \end{abstract}
 
-\begin{keywords}
-Visual analytics, imputation, spatial epidemiology, choropleth visualization, statistical evaluation
-\end{keywords}
+%\begin{keywords}
+%Visual analytics, imputation, spatial epidemiology, choropleth visualization, statistical evaluation
+%\end{keywords}
 
 % ---------------------------------------------------------------------------
 \section{Introduction}
 \label{sec:introduction}
-Missing data is a pervasive issue in spatio-temporal analysis, affecting domains ranging from public health surveillance and environmental monitoring to census demographics. Whether due to privacy suppression rules, sensor failures, or inconsistent reporting standards, these gaps distort spatial patterns and compromise downstream decision-making. Analysts are often forced to rely on black-box imputation methods that obscure the provenance of estimated values, making it difficult to distinguish between genuine spatial trends and artifacts of the imputation process.
+Missing data is a pervasive challenge across scientific, social science, and public health datasets. Gaps arising from privacy suppression, sensor outages, inconsistent reporting, or survey nonresponse can distort analyses and undermine downstream decisions. Analysts often rely on black-box imputation methods whose behavior is difficult to diagnose or compare, making it hard to understand how assumptions, relationships, or model biases shape the final dataset.
 
-Traditional statistical imputation pipelines separate algorithmic execution from exploratory analysis. Domain experts receive static tables with single imputations and limited provenance, making it difficult to judge whether spatial spillover, demographic similarity, or population scaling drove the estimates. This disconnect can erode trust, especially when decisions allocate scarce resources or inform critical policy. We contend that imputation is an inherently visual-analytic task: analysts need to compare algorithms, inspect neighbourhood contributions, gauge uncertainty, and rapidly export validated datasets.
+Most imputation workflows separate algorithmic execution from exploratory analysis: domain experts receive static tables or single imputed datasets with little insight into how estimates were produced. This disconnect obscures uncertainty, hides model-specific artifacts, and complicates the selection of imputation strategies—especially when results inform high-stakes decisions such as public health allocation, environmental monitoring, or demographic reporting. Because analysts and their agencies are held accountable for the datasets they release and the predictions derived from them, transparency in how missing values were estimated is essential. Analysts must reason about missingness mechanisms, evaluate competing methods, and inspect variable-level discrepancies—making imputation fundamentally a visual-analytic task.
 
-We introduce \tool, a system that couples advanced imputation strategies with coordinated views tailored to county-level analytics. While applicable to any spatio-temporal dataset, we demonstrate its capabilities using public health surveillance data. \tool integrates:
+We introduce ImputeViz, a general-purpose visual analytics dashboard that supports the workflow of diagnosing missingness, selecting and tuning imputation models, and evaluating their outputs. ImputeViz integrates widely used approaches such as MICE, Random Forest, XGBoost, kNN, and model-specific diagnostics within a coordinated, interactive interface.
+%that works across domains and data types.
+
+To support geospatial reasoning, we also include \textbf{gKNN}, a geographically informed kNN variant that blends socio-economic similarity and spatial proximity via a hybrid distance tuned with Bayesian optimization. While gKNN serves as a representative imputation method for spatial datasets, the primary novelty of this paper lies in the method-agnostic, provenance-rich visual analytics environment that hosts it. ImputeViz enables analysts to inspect any imputer’s neighborhood effects—including gKNN—and to compare geospatial and non-geospatial approaches within a unified workflow.
+
+%To support geospatial reasoning, we also introduce \textbf{gKNN}, a geographically informed kNN imputation method that blends socio-economic similarity and spatial proximity via a hybrid distance learned with Bayesian optimization. While gKNN is a pragmatic algorithmic contribution for county-level public health data, the primary novelty of this paper lies in the method-agnostic, provenance-rich visual analytics environment that hosts it. ImputeViz allows analysts to inspect gKNN’s neighborhood effects and to compare geospatial with non-geospatial approaches in a unified workflow.
+
+%%% Below is removed with the above one %%%
+
+% A second contribution is \textbf{gKNN}, a new geospatial imputation method that incorporates spatial structure into the missing value estimation. ImputeViz, while method-agnostic, offers an effective environment for examining gKNN’s behavior, allowing analysts to inspect neighborhood effects and compare geospatial with non-geospatial approaches. We demonstrate both contributions using public health surveillance data defined by US counties, though the system applies broadly to spatio-temporal and non-spatial datasets.
+
+%Missing data is a pervasive issue in spatio-temporal analysis, affecting domains ranging from public health surveillance and environmental monitoring to census demographics. Whether due to privacy suppression rules, sensor failures, or inconsistent reporting standards, these gaps distort spatial patterns and compromise downstream decision-making. Analysts are often forced to rely on black-box imputation methods that obscure the provenance of estimated values, making it difficult to distinguish between genuine spatial trends and artifacts of the imputation process.
+
+%Traditional statistical imputation pipelines separate algorithmic execution from exploratory analysis. Domain experts receive static tables with single imputations and limited provenance, making it difficult to judge whether spatial spillover, demographic similarity, or population scaling drove the estimates. This disconnect can erode trust, especially when decisions allocate scarce resources or inform critical policy. We contend that imputation is an inherently visual-analytic task: analysts need to compare algorithms, inspect neighbourhood contributions, gauge uncertainty, and rapidly export validated datasets.
+
+%We introduce \tool, a system that couples advanced imputation strategies with coordinated views tailored to county-level analytics. While applicable to any spatio-temporal dataset, we demonstrate its capabilities using public health surveillance data.
+
+\begin{comment}
+
+\tool integrates:
+\begin{enumerate}[label=\textbf{R\arabic*}, leftmargin=*]
+  \item \textbf{Model-agnostic imputation support.} ImputeViz integrates multiple imputation strategies—including our gKNN for geospatial contexts, MICE as a chained-equations baseline, and results from XGBoost, Random Forest, and KNN—within a unified backend that enables side-by-side comparison.
+  \item \textbf{Built-in quantitative validation.} A reproducible 20\% holdout protocol computes MAE, RMSE, sample-size summaries, and paired Wilcoxon tests across masked entries, providing statistical evidence for selecting or tuning imputation models.
+  \item \textbf{Interactive visual explanation.} A Next.js interface offers coordinated choropleths, distribution views, neighbor maps, and provenance-linked interaction (hover, click, drill-down), enabling analysts to inspect missingness, understand imputation logic, and export validated datasets.
+\end{enumerate}
+
+\end{comment}
+
+\begin{comment}
+
+\tool integrates:
 \begin{enumerate}[label=\textbf{R\arabic*}, leftmargin=*]
   \item \textbf{Algorithmic versatility.} FastAPI services expose \gknn for geographic and socio-economic spillover, \mice as a widely used chained-equations baseline, and import results from XGBoost, Random Forest, and KNN for non-linear benchmarking.
   \item \textbf{Quantitative validation.} A built-in 20\% holdout protocol computes MAE/RMSE, sample counts, and paired Wilcoxon tests for masked entries, enabling evidence-based algorithm selection before deployment.
   \item \textbf{Interactive explanation.} A Next.js interface provides linked choropleths, distribution charts, neighbour maps, and export tooling so epidemiologists can inspect and communicate imputation logic.
 \end{enumerate}
+
+\end{comment}
+
+We make the following contributions:
+\begin{enumerate}[label=\textbf{C\arabic*}, leftmargin=*]
+  \item \textbf{A visual analytics system \textit{ImputeViz}} for missing-data diagnosis and imputation evaluation.
+        It unifies missingness exploration, distributional and spatial comparisons, and provenance-aware inspection in an interactive workflow.
+
+  \item \textbf{A modular benchmarking backend.}
+        ImputeViz runs MICE, Random Forest, XGBoost, kNN, and gKNN under consistent masking and provides quantitative metrics for method selection.
+
+  \item \textbf{A new geospatial imputation method (gKNN).}
+        gKNN blends spatial and attribute distances with Bayesian tuning and exposes neighbor-level contributions for interpretability.
+\end{enumerate}
+% C3 A geospatial kNN imputation method (gKNN) integrated into ImputeViz. We propose gKNN, a geographically informed kNN imputation method that blends socio-economic similarity and geographic proximity via a hybrid distance learned with Bayesian optimization. Within ImputeViz, gKNN serves both as a domain-tailored algorithmic contribution and as a running example of how the dashboard surfaces donor provenance and compares geospatial models with standard imputers.
+
+
+\begin{comment}
+We make the following three major  contributions:
+\vspace{-0.8 em}
+\begin{enumerate}[label=\textbf{C\arabic*}, leftmargin=*]
+  \item \textbf{A general-purpose visual analytics system for missing-data diagnosis and imputation evaluation.} \\ ImputeViz provides coordinated visual and statistical diagnostics—including missingness structure views, distributional comparisons, neighbor-level provenance inspection, and model-specific discrepancy metrics, supporting the end-to-end workflow of imputation analysis.
+  \item \textbf{A modular imputation backend that supports direct benchmarking across multiple models.} \\ The system integrates KNN, MICE, Random Forest, XGBoost, and gKNN within a reproducible pipeline that includes quantitative validation (MAE/RMSE, paired Wilcoxon tests) and comparative ranking for evidence-based model selection.
+  \item \textbf{A new geospatial imputation method (gKNN).} \\ gKNN incorporates spatial structure into nearest-neighbor estimation, using Bayesian optimization to learn distance weights while preserving information about which neighbors contribute to each imputed value. ImputeViz offers a visual-analytic environment for examining gKNN’s behavior and comparing it with non-geospatial models.
+\end{enumerate}
+
+\end{comment}
+
+\begin{comment}
 
 Our contributions are threefold:
 \begin{itemize}[leftmargin=*]
@@ -93,304 +175,431 @@ Our contributions are threefold:
   \item A visual analytics workflow that makes imputation provenance explainable: hoverable neighbour relationships, contributor ranks, and algorithm-specific diagnostics rendered on-demand.
 \end{itemize}
 
+\end{comment}
+
+In the remainder of this paper, Section 2 reviews related work. Section 3 presents design goals. Section 4 introduces the datasets. Section 5 describes our methodology and system design. Section 6 outlines the imputation framework and Section 7 presents the front-end interface. Sections 8 and 9 provide case studies and a system evaluation, and Sections 10 and 11 conclude with a discussion and final remarks.
+
 % ---------------------------------------------------------------------------
+\section{Related Work}
+\label{sec:related}
+We review prior work in four areas: (i) imputation methods and missing-data analysis, (ii) visual analytics systems that support data quality and model reasoning, (iii) techniques for visualizing and communicating uncertainty and missingness, and (iv) visual analytics in public health, our primary domain application.
+
+\paragraph*{Imputation and missing-data analysis.}
+Imputation has been widely studied across statistics, machine learning, and applied domains. Classical approaches include multivariate chained equations (\mice)~\cite{VanBuuren2018MICE}, regression-based estimators, and hierarchical Bayesian models for structured data~\cite{Waller2016BayesianSmallArea}. Machine-learning methods such as Random Forest~\cite{Breiman2001RandomForest}, XGBoost~\cite{Chen2016XGBoost}, and kNN~\cite{Cover1967KNN} provide flexible non-linear alternatives, and surveys such as Lin and Tsai~\cite{lin2020missing} review their performance across heterogeneous datasets. Spatial extensions of kNN incorporate geographic proximity or neighborhood similarity~\cite{baker2014missing}. \gknn formulation is closest to these spatially weighted kNN and metric-learning approaches: we construct a hybrid distance over socio-economic and geographic features and learn its weights via Bayesian optimization \cite{snoek2012practical} while preserving information about which neighbors contribute to each imputed value. This makes gKNN a pragmatic, domain-aligned extension of existing kNN ideas. The main focus of this paper, however, is on how ImputeViz integrates gKNN and other methods into a unified backend that supports systematic masking, benchmarking, and diagnostic exploration.
+
+\paragraph*{Visual analytics for data quality and model reasoning.}
+Visual analytics has emphasized the integration of computational models with interactive exploration~\cite{Endert2017}. Prior systems support data quality assessment, provenance exploration, and sensemaking in domains such as public health surveillance~\cite{sankaran2016opioid, Carroll2014HealthVis}, transportation, and environmental monitoring. A dedicated literature on visualizing missing data includes early graphical interpretation studies~\cite{eaton2005visualizing}, matrix- and table-based approaches for revealing missingness structure~\cite{fernstad2014visual}, methods for evaluating missingness patterns~\cite{fernstad2019identify}, and glyph-based techniques for large-scale missing-value analysis~\cite{fernstad2021explore}. Recent work has also examined how users estimate or reason about missing values in visualizations~\cite{sun2024investigating}. While several systems visualize missingness or uncertainty~\cite{Sacha2016UncertaintyTrust}, they typically rely on precomputed imputations or static summaries. In contrast, \tool integrates algorithm execution with diagnostic visualization, enabling analysts to inspect the structure of missingness, compare competing imputation strategies, and interrogate model behavior within an iterative workflow.
+
+\paragraph*{Uncertainty and missingness communication.}
+Communicating uncertainty is a broad challenge in visualization~\cite{hullman2019authors}. Techniques span ensemble-based representations~\cite{potter2009ensemble}, sampling-based metaphors such as hypothetical outcome plots~\cite{Kale2019HOPsTrends}, and evaluating visualizations that contain missing data~\cite{song2018s}. Surveys such as Hullman et al.~\cite{hullman2018pursuit} synthesize evaluation practices across uncertainty visualizations. These principles motivate our design of coordinated views and tooltips that differentiate imputed and observed values, reveal neighbor contributions, and expose reconstruction-error metrics in ImputeViz. 
+
+Beyond visualization, the missing-data literature emphasizes principled uncertainty quantification through multiple imputation and copula-based models that separate marginal distributions from dependence structure~\cite{nelsen2006introduction,joe2014dependence,hollenbach2021multiple}. Our offline copula experiment for gKNN follows this line by probing the stability and coverage of imputed overdose rates under resampling, while the dashboard itself exposes lighter-weight holdout-error summaries and a cross-method comparison table suitable for interactive analysis.
+
+%within a transparent visual-analytic workflow.
+
+\paragraph*{Visual analytics in public health.}
+While ImputeViz is a domain-agnostic system, public health provides a salient example where missing data and spatial gaps can distort inference. Prior tools such as Opioid Atlas~\cite{sankaran2016opioid} and HealthVis~\cite{Carroll2014HealthVis} show how coordinated views aid surveillance and data-quality assessment, but they rely on precomputed values rather than exposing the imputation process itself. ImputeViz extends this line of work by integrating algorithmic imputation with provenance-rich diagnostics in a single workflow—supporting public-health analysis as one illustrative case, but equally applicable to any tabular or geospatial dataset with heterogeneous missingness.
+
+%Although ImputeViz is designed to be domain-agnostic, public health is one setting where missing data and spatial gaps are especially consequential. Prior systems such as Opioid Atlas~\cite{sankaran2016opioid} and HealthVis~\cite{Carroll2014HealthVis} demonstrate how coordinated views support surveillance, trend exploration, and data-quality assessment. These tools highlight the need for transparent reasoning about data incompleteness, yet they typically operate on precomputed values rather than integrating the imputation process itself. Our work complements this literature by embedding algorithmic imputation and diagnostic visualization within a single workflow, enabling analysts to interrogate spatial spillover and compare imputation strategies, while also generalizing to non-health domains with missing, heterogeneous tabular data.
+
+%Although ImputeViz is designed to be domain-agnostic, public health is one setting where missing data and spatial gaps are especially consequential. Prior systems such as Opioid Atlas~\cite{sankaran2016opioid} and HealthVis~\cite{Carroll2014HealthVis} demonstrate how coordinated views support surveillance, trend exploration, and data quality assessment. These tools highlight the need for transparent reasoning about data incompleteness, yet they typically operate on precomputed values rather than integrating the imputation process itself. Our work complements this literature by embedding algorithmic imputation and diagnostic visualization within a single workflow, enabling analysts to interrogate spatial spillover, compare imputation strategies, and understand how missingness affects downstream public-health indicators.
+
+% \vspace{-8pt}
+\section{Design Goals}
+We designed \tool around four designs goals (DG) derived from discussions with a public-health analyst and a bio-statistician, and informed by the limitations of existing imputation workflows:
+
+\begin{enumerate}[label=\textbf{DG\arabic*}, leftmargin=*]
+  \item \textbf{Provide clear visibility into missingness and the underlying data.} Analysts must understand what is missing and why. There should be a raw table, missingness summaries and variable–target/variable–variable comparisons to reveal structure and potential MCAR/MAR/MNAR mechanisms.
+  \item \textbf{Support model-agnostic imputation and consistent evaluation.} The system should run multiple imputation methods (MICE, Random Forest, XGBoost, kNN, gKNN) under identical masking and feature handling, and surface comparable metrics in one place---MAE, RMSE, $\Delta$RMSE, and runtime for each executed algorithm---alongside paired tests where appropriate for evidence-driven model selection.
+  \item \textbf{Enable interactive visual comparison of pre- and post-imputation outcomes.} Analysts need to see how imputations change distributions and relationships (linked histograms, scatterplots, discrepancy views) to assess plausibility, detect fragile variables, and understand differences across models, with stable encodings when switching methods (e.g., fixed axis scales) so comparisons do not require mentally integrating incompatible visual ranges.
+  \item \textbf{Make spatial and provenance patterns interpretable.} Since many public-health datasets are spatial, the system should include choropleth maps that show pre/post values and donor contributions, helping users evaluate neighborhood effects, spillover, and region-specific discrepancies.
+\end{enumerate}
+
+Although many of our examples draw on public-health data, these goals are not domain-specific. They reflect a general need for transparent, provenance-aware workflows that help analysts compare, debug, and interpret heterogeneous imputation methods.
+
+
+\begin{comment}
 \section{Related Work}
 \label{sec:related}
 We review prior work in (i) spatial imputation for public health, (ii) visual analytics systems supporting epidemiological decision-making, and (iii) uncertainty communication in choropleth maps.
 
-\paragraph*{Spatial imputation.} Methods for population-health imputation range from global regression to hierarchical Bayesian smoothing~\cite{Waller2016BayesianSmallArea}. Geographic KNN variants exploit adjacency and socio-economic stability~\cite{Lu2017SpatialKNN}. \gknn extends this family with socio-economic distance blending learned via Bayesian optimisation. \mice remains a standard for multivariate imputation~\cite{VanBuuren2018MICE}, while tree-based methods like Random Forest~\cite{Breiman2001RandomForest} and XGBoost~\cite{Chen2016XGBoost}, along with instance-based KNN~\cite{Cover1967KNN}, provide flexible non-linear alternatives. Our work adapts these algorithms to a unified backend with target-specific masking for evaluation.
+\paragraph*{Spatial imputation.} Methods for population-health imputation range from global regression to hierarchical Bayesian smoothing~\cite{Waller2016BayesianSmallArea}. Geographic KNN variants exploit adjacency and socio-economic stability~\cite{baker2014missing}. \gknn extends this family with socio-economic distance blending learned via Bayesian optimization. \mice remains a standard for multivariate imputation~\cite{VanBuuren2018MICE}, while tree-based methods like Random Forest~\cite{Breiman2001RandomForest} and XGBoost~\cite{Chen2016XGBoost}, along with instance-based KNN~\cite{Cover1967KNN}, provide flexible non-linear alternatives. Our work adapts these algorithms to a unified backend with target-specific masking for evaluation.
 
-\paragraph*{Visual analytics for health data.} Systems such as Opioid Atlas~\cite{Ghosh2019OpioidAtlas} and HealthVis\cite{Carroll2014HealthVis} display surveillance data through coordinated views. Fewer works emphasise the imputation stage itself; notable exceptions include ViSUS for uncertainty exploration~\cite{Kwon2016DPMHU} and evaluations of missing data visualization techniques~\cite{SongSzafir2018}, yet they often rely on precomputed imputations. \tool closes this gap by integrating algorithm execution and diagnostic visualization, following the paradigm of integrating machine learning with visual analytics~\cite{Endert2017}.
+\paragraph*{Visual analytics for health data.} Systems such as Opioid Atlas~\cite{sankaran2016opioid} and HealthVis\cite{Carroll2014HealthVis} display surveillance data through coordinated views. Fewer works emphasise the imputation stage itself; notable exceptions include ViSUS for uncertainty exploration~\cite{Sacha2016UncertaintyTrust} and evaluations of missing data visualization techniques~\cite{SongSzafir2018}, yet they often rely on precomputed imputations. \tool closes this gap by integrating algorithm execution and diagnostic visualization, following the paradigm of integrating machine learning with visual analytics~\cite{Endert2017}.
 
-\paragraph*{Uncertainty communication.} Conveying imputation uncertainty remains challenging~\cite{Hullman2019Uncertainty}. Techniques include ensemble glyphs~\cite{Potter2012Ensemble} and interval encoding~\cite{Hullman2015Hypothetical}. We align with guidance on differentiating observed versus imputed values~\cite{Correll2018Considerations}, employing colour encodings and tooltips that reveal donor counties and metric confidence.
+\paragraph*{Uncertainty communication.} Conveying imputation uncertainty remains challenging~\cite{Hullman2019Uncertainty}. Techniques include ensemble glyphs~\cite{potter2009ensemble} and sampling-based
+representations such as hypothetical outcome plots~\cite{Kale2019HOPsTrends}. We align with guidance on differentiating observed versus imputed values~\cite{Correll2018Considerations}, employing colour encodings and tooltips that reveal donor counties and metric confidence.
 
+\end{comment}
 % ---------------------------------------------------------------------------
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.9\linewidth]{user_flow.png}
+  \caption{Overview of the seven-stage ImputeViz workflow (A–G), from data configuration to validation and error analysis.}
+  \label{fig:workflow}
+\end{figure*}
+
 \section{Data}
 \label{sec:data}
-\subsection{County overdose archives}
-To demonstrate the utility of \tool, we utilize the CDC ``Overdose Mapping Tool'' county-level CSVs (2015--2023) as our primary case study. This dataset exemplifies the challenges of modern spatio-temporal data: it contains systematic missingness due to privacy suppression in low-count counties, exhibits strong spatial autocorrelation, and relies on complex socio-economic covariates. Each record encodes county FIPS, crude overdose rate, estimated deaths, and supporting socio-economic indicators. Low-count counties (\(<10\) deaths) suppress the overdose rate, producing the target missingness. We align the dataset with ACS-derived population estimates (``Population\_2000\_2022.csv'') and geographic coordinates from the CDC shapefiles.
 
-\subsection{Derived covariates}
-We compute additional covariates to support \tool's algorithms:
-\begin{itemize}[leftmargin=*]
-  \item Socio-economic feature vectors (education, income, unemployment) aggregated from the CDC socio-economic workbook.
-  \item Spatial adjacency via queen-contiguity on the county GeoJSON; we precompute adjacency lists for the front-end choropleth.
-  \item Temporal smoothing: rolling averages (12-month) for overdose rates to capture local trends.
-\end{itemize}
+\paragraph*{Public health dataset.}To demonstrate the utility of \tool, we use county-level drug poisoning mortality data from CDC WONDER~\cite{cdcWonderDrugPoisoning}, the official U.S.\ mortality query system that suppresses counts below 10 to protect privacy. This suppression produces systematic missingness in low-count counties, making the dataset a natural testbed for imputation. We focus on prescription-opioid deaths and aggregate records to crude mortality rates and death counts aligned with county FIPS codes for 2000--2022. Population denominators are taken from the U.S.\ Census Bureau’s American Community Survey (ACS)~\cite{acsPopulation}, and county geometries from TIGER/Line shapefiles~\cite{tigerShapefiles}. From the ACS workbook we derive socioeconomic feature vectors (e.g., education, income, unemployment) for each county; from the geometries we compute haversine distances between county centroids and a queen-contiguity adjacency graph. Together, these sources yield realistic spatio-temporal challenges---irregular suppression, spatial autocorrelation, and heterogeneous covariates---well suited to evaluating competing imputation strategies.
 
-\subsection{Missingness mechanism}
-The missingness is not MCAR~\cite{LittleRubin2019}: suppressed counties tend to be low-population and belong to neighbouring clusters, triggering spatial dependence. This motivates algorithms that leverage geographic proximity and demographic similarity, justifying the inclusion of \gknn alongside baseline chained-equations (\mice) and the XGBoost, Random Forest, and KNN benchmarks.
+Suppression is not MCAR: missing entries are concentrated in small-population counties and often occur in spatial clusters. This motivates algorithms that leverage both geographic proximity and demographic similarity, justifying the inclusion of \gknn{} alongside chained-equations imputation (\mice) and non-spatial tabular baselines such as XGBoost, Random Forest, and kNN.
+
+% To demonstrate the utility of \tool, we use county-level drug poisoning mortality data from CDC WONDER~\cite{cdcWonderDrugPoisoning}, the official governmental mortality query system that suppresses counts below 10 to protect privacy. This suppression produces systematic missingness, which is often significant, in counties with low overdose counts, making the dataset a natural testbed for imputation. The records contain crude mortality rates, death counts, and demographic descriptors aligned with county FIPS codes for 2015--2023. We supplement these data with population estimates from the U.S. Census Bureau’s American Community Survey (ACS)~\cite{acsPopulation} and county geometries from the U.S. Census TIGER/Line shapefiles~\cite{tigerShapefiles}. Together, these sources expose realistic spatio-temporal challenges—irregular suppression, spatial autocorrelation, and heterogeneous covariates—well suited to evaluating competing imputation strategies.
+
+% \paragraph*{Derived covariates.}
+% We compute additional covariates to support \tool's algorithms:
+% \begin{itemize}[leftmargin=*]
+%   \item Socio-economic feature vectors (education, income, unemployment) aggregated from the CDC socio-economic workbook.
+%   \item Spatial adjacency via queen-contiguity on the county GeoJSON; we precompute adjacency lists for the front-end choropleth.
+%   \item Temporal smoothing: rolling averages (12-month) for overdose rates to capture local trends.
+% \end{itemize}
+
+% \paragraph*{Missingness mechanism.}
+% The missingness is not MCAR (Missing Completely At Random)~\cite{LittleRubin2019}: suppressed counties tend to be low-population and belong to neighboring clusters, triggering spatial dependence. This motivates algorithms that leverage geographic proximity and demographic similarity, justifying the inclusion of \gknn alongside baseline chained-equations (\mice) and the XGBoost, Random Forest, and KNN benchmarks.
+
+\paragraph*{Telecom churn dataset.}
+To demonstrate \tool on a purely non-geographic problem, we also include a publicly available telecom customer dataset hosted on Hugging Face~\cite{telcoHF}\footnote{We first encountered this dataset via a Kaggle version and then adopted the Hugging Face mirror for convenience and reproducibility.}. After dropping rows with missing target, the subset we analyze contains 212 customer records. We treat the continuous \texttt{Offer} field as the imputation target and use ten numerical covariates as predictors: age, tenure in months, average monthly data usage, churn score, customer lifetime value (CLTV), number of referrals, satisfaction score, monthly charge, total charges, and total revenue. Categorical attributes (e.g., payment method, contract type, churn reason) remain in the raw table but are not used as features in our current models.
 
 % ---------------------------------------------------------------------------
 \section{Methodology and System Design}
 \label{sec:method}
-\subsection{Architecture overview}
-	ool follows a client--server architecture that keeps heavy computation inside a Python/FastAPI stack while exposing responsive exploration in a Next.js 15 front end. Uploaded CSVs enter a session manager that (i) stores raw and merged dataframes, (ii) persists feature encoders, and (iii) tracks evaluation masks. The imputation engine runs three services---our proposed \gknn optimiser, the \mice baseline, and benchmark runners for XGBoost, Random Forest, and KNN---behind REST endpoints. Results, provenance metadata (neighbour maps, hyperparameters), and validation statistics are serialized to a Redis-backed cache so the interface can request updated views without recomputing models.
 
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=\linewidth]{Dashboard.png}
-  \caption{System Overview: The GeoImputeVis dashboard integrates (A) an Imputation Configuration panel for algorithm selection, (B) an interactive Choropleth Map for spatial exploration, (C) a Neighbour Modal for inspecting donor provenance, and (D) Evaluation panels for statistical validation.}
-  \label{fig:teaser}
-\end{figure*}
+\tool follows a client--server architecture that keeps heavy computation in a Python/FastAPI backend while exposing responsive exploration in a React/TypeScript front end. Uploaded CSVs enter a session manager that (i) stores raw and merged dataframes, (ii) retains feature encoders, and (iii) tracks evaluation masks. The imputation engine exposes three services---our proposed \gknn{} optimizer, a \mice{} baseline, and benchmark runners for XGBoost, Random Forest, and kNN---behind REST endpoints. Results, provenance metadata (neighbor maps, hyperparameters), and validation statistics are cached so the interface can request updated views without recomputing models.
 
-On the client side, React state (\texttt{useDataStore}) orchestrates asynchronous calls to the backend, coordinates map selections, and manages derived summaries. Shared TypeScript models guarantee consistency between the statistical responses and the UI components, allowing designers to iterate quickly on visual encodings without touching the Python layer.
+On the client side, shared TypeScript models ensure consistency between statistical responses and UI components. A central state store coordinates asynchronous calls, map selections, and derived summaries, allowing designers to iterate on visual encodings without touching the Python layer and keeping latency within interactive bounds.
+
+% On the client side, React state (\texttt{useDataStore}) orchestrates asynchronous calls to the backend, coordinates map selections, and manages derived summaries. Shared TypeScript models guarantee consistency between the statistical responses and the UI components, allowing designers to iterate quickly on visual encodings without touching the Python layer.
 
 \subsection{User workflow}
-The canonical workflow, derived from contextual inquiry with Stony Brook University analysts, proceeds through seven distinct stages:
-\begin{enumerate}[leftmargin=*, label={\Alph*)}]
-  \item \textbf{Data Configuration.} Users begin by uploading their dataset (CSV format) to the secure session manager. The system parses the file, detects schema types, and provides an initial summary of the uploaded data structure.
-  \item \textbf{Missingness Diagnosis.} The dashboard generates a missingness summary, highlighting columns with missing values (NaNs). Analysts review these statistics to identify potential target variables for imputation and assess the extent of data suppression.
-  \item \textbf{Pre-Imputation Visualization.} To understand the mechanism of missingness, users explore pre-imputation plots that visualize the distribution of missing values against other attributes. This helps in identifying systematic patterns or correlations that might inform model selection.
-  \item \textbf{Algorithm Configuration and Execution.} Users select an imputation strategy (e.g., \gknn, \mice, XGBoost) and tune hyperparameters such as the number of neighbors or iterations. The configuration panel allows for precise control before triggering the imputation process on the selected target column.
-  \item \textbf{Distributional Comparison.} Post-imputation, the system displays comparative histograms~\cite{Gleicher2011} showing the spread of imputed values versus the original observed values. This visual check ensures that the imputed distribution aligns with domain expectations and does not introduce artifacts.
-  \item \textbf{Bivariate Analysis.} Scatterplots allow analysts to examine the relationship between imputed values and other covariates ("Rest vs Imputed"). This step is crucial for verifying that multivariate relationships are preserved and that imputed points do not form implausible clusters.
-  \item \textbf{Validation and Error Analysis.} Finally, the validation panel reports quantitative metrics. Users can observe the absolute difference for randomly sampled holdout data to gauge algorithm performance at a granular level, alongside aggregate metrics like RMSE and MAE.
-\end{enumerate}
+\label{Uworkflow}
+Figure \ref{fig:workflow} summarizes the canonical ImputeViz workflow, which we derived through conversations with our collaborating analysts. They typically progress from (A) uploading a CSV and inspecting a parsed table, through (B) missingness diagnosis and (C) pre-imputation visualization, to (D) configuring one or more imputers (gKNN, \mice, tree ensembles, kNN) and triggering runs on a chosen target. Post-imputation, panels (E--F) support bivariate analysis and distributional comparison, while panel~(G) aggregates validation metrics for \emph{all} executed algorithms under the held-out mask (MAE, RMSE, $\Delta$RMSE, runtime). Cached outputs and aligned plot scales ease comparison when switching the active method. Section~\ref{sec:frontend} details how these stages are realized in the dashboard panels.
 
-\subsection{Interaction and encodings}
-The interface emphasises spatial reasoning through an Albers USA choropleth where hue encodes observed versus imputed rates and dashed outlines indicate masked counties. Donor counties appear in contrast colours (navy/teal) proportional to their inverse-distance weights, echoing the \gknn objective. Histogram lenses summarise marginal distributions before/after imputation, while scatter plots preserve covariate relationships so analysts can detect implausible shifts. Status toasts and progress bars expose backend state transitions (queued, running, cached) to maintain user awareness.
+% Figure~\ref{fig:workflow} summarises the canonical ImputeViz workflow,
+% derived from contextual inquiry with our university analysts. The process
+% proceeds through seven stages (A–G):
+% \begin{enumerate}[leftmargin=*, label={\Alph*)}]
+%   \item \textbf{Data Configuration.} Users begin by uploading their dataset (CSV format) to the secure session manager. The system parses the file, detects schema types, and provides an initial summary of the uploaded data structure.
+%   \item \textbf{Missingness Diagnosis.} The dashboard generates a summary of missingness, highlighting columns with missing values (NaNs). Analysts review these statistics to identify potential target variables for imputation and assess the extent of data suppression.
+%   \item \textbf{Pre-Imputation Visualization.} To understand the mechanism of missingness, users explore pre-imputation plots that visualize the distribution of missing values against other attributes. This helps in identifying systematic patterns or correlations that might inform model selection.
+%   \item \textbf{Algorithm Configuration and Execution.} Users select an imputation strategy (e.g., \gknn, \mice, XGBoost) and tune hyperparameters such as the number of neighbors or iterations. The configuration panel allows for precise control before triggering the imputation process on the selected target column.
+%   \item \textbf{Distributional Comparison.} Post-imputation, the system displays comparative histograms~\cite{Gleicher2011} showing the spread of imputed values versus the original observed values. This visual check ensures that the imputed distribution aligns with domain expectations and does not introduce artifacts.
+%   \item \textbf{Bivariate Analysis.} Scatterplots allow analysts to examine the relationship between imputed values and other covariates ("Rest vs Imputed"). This step is crucial for verifying that multivariate relationships are preserved and that imputed points do not form implausible clusters.
+%   \item \textbf{Validation and Error Analysis.} Finally, the validation panel reports quantitative metrics in a Method Comparison Summary (MAE, RMSE, $\Delta$RMSE, runtime) across all executed algorithms for the current mask, alongside linked post-imputation plots with stable scales when switching methods.
+% \end{enumerate}
 
-Design choices were guided by card sorting sessions and rapid A/B prototypes: minimalist legends reduce clutter during statewide analysis, while persistent tooltips summarise county name, metric, imputation status, and donor count for traceability. Tablets inherit the same layout through responsive CSS grid, enabling field deployment.
+% \subsection{Interaction and encodings}
+% The interface emphasises spatial reasoning through an Albers USA choropleth where hue encodes observed versus imputed rates and dashed outlines indicate masked counties. Donor counties appear in contrast colours (navy/teal) proportional to their inverse-distance weights, echoing the \gknn objective. Histogram lenses summarise marginal distributions before/after imputation, while scatter plots preserve covariate relationships so analysts can detect implausible shifts. Status toasts and progress bars expose backend state transitions (queued, running, cached) to maintain user awareness.
 
-\subsection{Design Process and Requirements Analysis}
-We adopted an agile co-design process spanning six sprints to ensure the system met the practical needs of public health analysts.
-\paragraph*{Requirement Analysis.}
-Initial semi-structured interviews with two senior epidemiologists at the Stony Brook Hospital revealed that existing workflows were fragmented. Analysts manually stitched spreadsheets and lacked visual tools to verify imputation plausibility. These sessions crystallized three core requirements: (R1) the need for \textit{algorithmic versatility} to handle diverse missingness patterns; (R2) \textit{quantitative validation} to justify methods to policy-makers; and (R3) \textit{interactive explanation} to build trust in the "black box" of imputation.
+% Design choices were guided by card sorting sessions and rapid A/B prototypes: minimalist legends reduce clutter during statewide analysis, while persistent tooltips summarise county name, metric, imputation status, and donor count for traceability. Tablets inherit the same layout through responsive CSS grid, enabling field deployment.
 
-\paragraph*{Prototyping and Refinement.}
-Design iterations moved from low-fidelity whiteboard sketches to high-fidelity Figma prototypes. Early feedback highlighted that standard choropleth legends were insufficient for distinguishing imputed from observed data, leading to our dual-gradient color encoding. Accessibility reviews prompted the adoption of the Viridis palette and high-contrast hatch patterns for masked data. Weekly check-ins with stakeholders drove the addition of cached reruns, Wilcoxon reporting, and the export provenance tags, ensuring the final system aligns with analysts' trust and auditability needs.
+% \subsection{Design Process and Requirements Analysis}
+% We adopted an agile co-design process spanning six sprints to ensure the system met the practical needs of public health analysts.
+% \paragraph*{Requirement Analysis.}
+% Initial semi-structured interviews with two senior epidemiologists at the Stony Brook Hospital revealed that existing workflows were fragmented. Analysts manually stitched spreadsheets and lacked visual tools to verify imputation plausibility. These sessions crystallized three core requirements: (R1) the need for \textit{algorithmic versatility} to handle diverse missingness patterns; (R2) \textit{quantitative validation} to justify methods to policy-makers; and (R3) \textit{interactive explanation} to build trust in the "black box" of imputation.
+
+\subsection{Design process and requirements}
+To ensure that \tool met the practical needs of public-health analysts, we adopted an agile co-design process with a group of public health researchers at a collaborating university. Initial semi-structured interviews revealed that existing workflows were fragmented: analysts manually stitched spreadsheets, ran imputers via scripts, and lacked visual tools to verify plausibility or explain results to stakeholders. These sessions crystallized three core requirements:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{R1: Algorithmic versatility.} Support multiple commonly used imputers so that analysts can match methods to diverse missingness patterns rather than committing to a single model.
+  \item \textbf{R2: Quantitative validation.} Provide consistent masking protocols and error summaries (e.g., MAE/RMSE, $\Delta$RMSE, runtime, and cross-method tabular comparison) to justify method choice in reports and audits.
+  \item \textbf{R3: Interactive explanation.} Make imputation decisions explainable through provenance-rich views that reveal donor sets, spatial context, and how imputations reshape distributions.
+\end{itemize}
+
+These requirements guided both the backend design (Section~\ref{sec:backend}) and the front-end visual analytics components (Section~\ref{sec:frontend}).
+
 
 % ---------------------------------------------------------------------------
 \section{Backend Imputation Framework}
 \label{sec:backend}
-The backend exposes RESTful endpoints (FastAPI) orchestrating data upload, imputation, evaluation, and download.
+The backend exposes RESTful endpoints (FastAPI) for data upload, imputation, evaluation, and download. Completed runs are cached per dataset and algorithm so that changing masks, inspecting counties, or switching the active method reloads stored results---including the comparison table and linked plots---without recomputing models, typically within hundreds of milliseconds on a standard workstation.
 
-\subsection{Session management}
-Each upload generates a `session\_id`, storing (i) the merged dataframe, (ii) raw upload, and (iii) label encoders for categorical columns. Upon ingestion, the backend immediately profiles the dataset to calculate missingness statistics, which populate the initial diagnostic views. Sessions persist in memory to support iterative parameter tuning.
+\subsection{Session management, profiling, and robustness}
+Each upload creates a \texttt{session\_id} that stores (i) the raw table, (ii) the merged analysis dataframe, and (iii) label encoders for categorical columns. Upon ingestion, the backend profiles the dataset: it infers basic column roles (identifiers, temporal fields, numeric covariates, candidate targets), computes null counts and percentages, and constructs a binary missingness matrix. These summaries drive the missingness bar charts and pre-imputation views in the dashboard. Co-missingness rates and simple correlations between missingness indicators and covariates underpin the “missing vs.\ covariate” plots used to probe MCAR/MAR/MNAR patterns. All profiling outputs are cached as compact JSON blobs and reused across interactions.
 
-\subsection{Data Profiling and Diagnostics}
-To support the pre-imputation visualization and missingness diagnosis steps, the backend includes a dedicated profiling module. This service computes column-wise null counts, correlations between missingness indicators and other covariates, and prepares aggregated data for the front-end visualizations. This ensures that analysts have a comprehensive understanding of the data quality before selecting an imputation model.
+Imputation runs write back a completed dataframe and a ready-to-download CSV that merges original and imputed values. Cached results are keyed by (session, algorithm, target, mask configuration) to prevent recomputation on repeated requests.
+
+Robustness is handled through lightweight validation and defensive fallbacks. Uploads are first checked against a minimal schema: the system requires at least one column that can serve as a row identifier, and (for spatial workflows) a geocode column that can be mapped to counties. If a dataset lacks valid FIPS/GEOID information, it is still accepted but the geomap view is disabled and the dashboard operates in purely tabular mode. String placeholders for missing values are normalized to NaN to avoid downstream type errors. For matrix-based methods such as \mice, ill-conditioned systems trigger ridge-regularized chains; in \gknn, if no donors fall within the initial search radius, the backend gradually relaxes socioeconomic constraints or expands the radius until a valid neighborhood is found. Unmatched counties during joins (e.g., FIPS changes) are flagged as a separate category rather than causing render failures, so the rest of the map remains interactive.
+
+% \subsection{Session management}
+% Each upload generates a `session\_id`, storing (i) the merged dataframe, (ii) raw upload, and (iii) label encoders for categorical columns. Upon ingestion, the backend immediately profiles the dataset to calculate missingness statistics, which populate the initial diagnostic views. Sessions persist in memory to support iterative parameter tuning.
+
+% After runs, the backend stores a ready-to-download CSV merging original and imputed values. Repeated requests re-use cached results keyed by (session, algorithm, columns, iterations) to accelerate exploratory analysis.
+
+% \subsection{Data Profiling and Diagnostics}
+% To support the pre-imputation visualisation and missingness diagnosis steps, the backend exposes a dedicated profiling module that runs when a new session is created. Given the merged county-level dataframe, this service first infers basic column roles (identifiers, temporal fields, numeric covariates, and candidate targets) and computes column-wise null counts and percentages. These statistics populate the initial missingness bar charts and summary table, giving analysts a quick overview of which variables are heavily suppressed or sparsely observed.
+
+% Beyond marginal summaries, the profiler constructs a binary missingness matrix and derives pairwise co-missingness rates and simple correlations between missingness indicators and other covariates. These aggregates drive the co-missingness heatmap and the “missing vs.\ covariate” plots used to probe potential MCAR, MAR, or MNAR patterns. For numeric covariates, the module also pre-computes grouped distribution summaries (e.g., means and quantiles for observed vs.\ missing subsets) so that the front end can render linked histograms and box plots without repeatedly scanning the full table. All profiling outputs are cached per session as compact JSON blobs and reused across interactions, enabling analysts to explore data quality and missingness structure interactively before selecting and configuring an imputation model.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\linewidth]{Dashboard_new.png}
+    \vspace{-10 pt}
+    \caption{ImputeViz dashboard with seven linked panels (a–g) for data configuration, missingness diagnosis, pre- and post-imputation views, distributional comparison, and error analysis, as detailed in Section~\ref{sec:frontend}}
+  % \caption{System Overview: The ImputeViz dashboard integrates (A) an Imputation Configuration panel for algorithm selection, (B) an interactive Choropleth Map for spatial exploration, (C) a Neighbor Modal for inspecting donor provenance, and (D) Evaluation panels for statistical validation.}
+  \label{fig:teaser}
+      \vspace{-5 pt}
+\end{figure*}
 
 \subsection{Imputation algorithms}
-\paragraph*{\gknn.} Our proposed \gknn pipeline first harmonises CDC overdose records with the CDC socio-economic workbook through the shared FIPS-derived GEOID. We compute seven complementary feature-importance diagnostics (Pearson, Spearman, mutual information, random forest, lasso, and their SHAP attributions) using \texttt{fetureImp.py}. Their min--max normalised average yields a combined score whose elbow is detected via \texttt{KneeLocator}; the union of elbow-selected and thresholded signals defines the socio-economic subspace that drives distance learning. For every county we derive min--max scaled Euclidean matrices for socio-economic similarity \(D_{\text{socio}}\) and geographic proximity \(D_{\text{geo}}\) (latitude/longitude).
+ImputeViz integrates a small set of representative algorithms that are widely used in practice for imputation tasks. The aim is not to exhaustively benchmark all possible methods, but to provide a unified, interpretable workspace where analysts can compare several reasonably strong baselines under consistent masking and inspect their behavior through provenance-aware views.
 
-Bayesian optimisation (\texttt{Optuna}) samples \(\alpha \in [0,1]\) and discrete \(k \in \{1,3,5,7\}\) using a 20\% random mask of observed counties as the validation objective. Each trial forms
+\paragraph*{Linear regression.}
+For a simple parametric baseline, we fit an ordinary least-squares linear regression to predict overdose rates from the selected socioeconomic features. This model captures global linear trends and ignores spatial structure, but is fast to compute and provides a transparent reference for how flexible methods improve upon a purely linear specification.
+
+\paragraph*{KNN regression.}
+We also include a non-spatial kNN regressor that operates directly in the socioeconomic feature space. This model uses Euclidean distance and averages responses from the nearest neighbors without any geographic component. Comparing its behavior to \gknn{} helps disentangle the contribution of spatial distance from generic instance-based learning.
+
+\paragraph*{Random forest.}
+Random Forest regression~\cite{Breiman2001RandomForest} offers a strong non-linear baseline. We use an ensemble of decision trees with standard scikit-learn defaults trained on the same socioeconomic feature set. Random Forest can capture complex interactions among covariates but does not expose explicit spatial provenance; its predictions are treated as a black-box tabular model and compared to \gknn{} through error distributions and derived summaries.
+
+\paragraph*{XGBoost.}
+We integrate XGBoost~\cite{Chen2016XGBoost} as a gradient-boosted tree baseline that is competitive on many tabular benchmarks. We configure a modest number of boosting rounds and tree depth to balance accuracy and runtime for interactive use. Like Random Forest, XGBoost leverages non-linear feature interactions but remains non-spatial; ImputeViz allows analysts to contrast its aggregate accuracy with that of \gknn{} while relying on the provenance views to interpret how spatial borrowing affects gKNN predictions.
+
+
+\paragraph*{MICE.}
+% For the classical baseline, we apply scikit-learn's IterativeImputer with ridge regression chains. Categorical columns are label-encoded through bespoke encoders so that chained regressors respect ordinal mappings. The validation wrapper masks 20\% of observed entries per target column, performs 10 burn-in iterations with three imputations per feature, and reports MAE/RMSE alongside sample counts so users can contrast predictive fidelity with \gknn.
+For a classical non-spatial baseline, we apply scikit-learn's \texttt{IterativeImputer}, following the multivariate chained-equations paradigm of MICE~\cite{vanBuuren2011mice,VanBuuren2018MICE}, with ridge regression chains. Categorical columns are label-encoded so that the chained regressors respect ordinal structure. The evaluation wrapper masks 20\% of observed entries for the selected target and runs a fixed number of burn-in and refinement iterations, yielding a single completed dataset rather than full Rubin-style multiple imputation. We then compute MAE, RMSE, and sample counts on the held-out entries so that users can contrast MICE's multivariate, non-spatial behavior with \gknn{} and the tree-based regressors under the same masking regimes. We use deterministic MICE for stability in interactive comparisons.
+
+\paragraph*{gKNN.}
+Our proposed \gknn{} pipeline first harmonizes CDC overdose records with the ACS socioeconomic workbook through the shared FIPS-derived GEOID and constructs a socioeconomic subspace guided by feature importance: for each candidate predictor, we compute multiple diagnostics (Pearson and Spearman correlation, mutual information, random forest importance, LASSO coefficients, and their SHAP attributions). After min--max normalization, these scores are averaged to obtain a combined importance profile; \texttt{KneeLocator} detects an elbow, and any feature above a user-defined threshold is also retained. The resulting subset defines the socioeconomic space used in distance learning and is reused across all algorithms for consistent comparison.
+
+For every county we derive min--max scaled distance matrices for socioeconomic similarity \(D_{\text{socio}}\) and geographic proximity \(D_{\text{geo}}\). \(D_{\text{socio}}\) is computed as Euclidean distance in the selected socio-economic subspace, while \(D_{\text{geo}}\) uses pairwise haversine distances between county centroids. Bayesian optimization (\texttt{Optuna}) samples \(\alpha \in [0,1]\) and a discrete neighborhood size \(k\) from a configurable grid (by default \(k \in \{1,3,5,7,9\}\)). Each trial forms
 \begin{equation}
-  D_{\text{blend}} = \alpha \cdot D_{\text{socio}} + (1-\alpha) \cdot D_{\text{geo}},
+  D_{\text{blend}} = \alpha \cdot D_{\text{socio}} + (1-\alpha) \cdot D_{\text{geo}}
 \end{equation}
-and minimises MAE on the masked rates. The resulting hyperparameters govern an inverse-distance weighted kNN imputation that gracefully handles zero-distance ties by averaging donors at identical locations. Every call to \texttt{impute\_death\_rate} returns both the imputed rate and a donor map keyed by County Code, enabling the interface to visualise neighbour provenance. Separate evaluation routines temporarily mask either a random 20\% subset or the withheld low-count counties to report MAE, RMSE, correlation, and signed-rank p-values. The backend also records benchmark regressors (linear, vanilla kNN, random forest, XGBoost) over the selected features to contextualise \gknn performance for analysts.
+and minimizes MAE on a validation mask of observed counties. The selected hyperparameters govern an inverse-distance weighted kNN imputation: each masked county is imputed from its \(k\) nearest donors under \(D_{\text{blend}}\), with zero-distance ties handled by averaging donors at identical locations. We deliberately keep a finite neighborhood size rather than a fully global kernel so that each prediction can be explained in terms of a small, concrete donor set. Every call to \texttt{impute\_death\_rate} returns both the imputed rate and a donor map keyed by GEOID, enabling the interface to visualize neighbor provenance alongside error summaries.
 
-\paragraph*{\mice.} For the classical baseline we apply scikit-learn's IterativeImputer with ridge regression chains. Categorical columns are label-encoded through bespoke encoders so that chained regressors respect ordinal mappings. The validation wrapper masks 20\% of observed entries per target column, performs 10 burn-in iterations with three imputations per feature, and reports MAE/RMSE alongside sample counts so users can contrast predictive fidelity with \gknn.
+\paragraph*{Beyond our implemented baselines.}
+Many other imputation techniques exist in the literature, including variants of random forest, more recent gradient-boosted ensembles, and specialized spatio-temporal models. We also considered methods such as MissForest \cite{stekhoven2012missforest} and probabilistic, copula-based, or deep-learning imputers; however, their runtime characteristics and lack of interpretable donor provenance make them difficult to integrate into an interactive VA workflow that requires rapid reconfiguration and transparent neighborhood reasoning. In this work we therefore focus on a compact set of methods that are widely used in applied settings and simple enough to run and explain within an interactive workflow. ImputeViz is implemented with a modular backend, so additional algorithms can be wrapped in the same masking and evaluation interface as domain needs or practitioner preferences evolve.
 
-\paragraph*{Benchmark Regressors.} To contextualise performance, we integrate standard machine learning regressors: XGBoost~\cite{Chen2016XGBoost}, Random Forest~\cite{Breiman2001RandomForest}, and KNN~\cite{Cover1967KNN}. These models ingest the same socio-economic feature set as \gknn. XGBoost and Random Forest capture non-linear interactions between demographic covariates, while KNN provides a baseline for instance-based learning without the spatial constraints of \gknn. These benchmarks run via scikit-learn and XGBoost libraries within the backend pipeline.
+%Many other imputation and tabular modeling techniques are available in the literature, including variants of random forest, more recent gradient-boosted ensembles, and specialized spatio-temporal models. In this work we focus on a compact set of methods that are widely used in applied settings and simple enough to run and explain within an interactive workflow. ImputeViz is implemented with a modular backend: new algorithms can be wrapped in the same masking and evaluation interface with minimal changes, so additional methods can be incorporated as domain needs or practitioner preferences evolve.
 
+\vspace{-6pt}
 \subsection{Evaluation protocol}
-All algorithms share the holdout protocol: mask 20\% of observable target values, impute, and record per-column metrics. We compute the absolute difference between imputed and masked values for the validation view, allowing users to inspect individual error cases. Additionally, we report aggregate metrics including RMSE, MAE, and Wilcoxon statistics (test statistic \(T\), p-value) to assess whether paired residuals differ significantly from zero error.
+\label{subsec:eval_protocol}
+ImputeViz supports a small family of masking regimes that share a common implementation but serve different purposes. For day-to-day use and a chosen target column, we identify entries with observed outcomes, sample 20\% of them uniformly at random, temporarily treat their outcomes as missing, and run all algorithms on this mask. The resulting per-entry absolute errors $\lvert y_i - \hat{y}_i \rvert$ drive the MAE, RMSE, normalized RMSE, and the Method Comparison Summary (including $\Delta$RMSE and runtime) shown in the evaluation view. To avoid leakage, tuning uses only entries marked as observed under the masking regime; held-out values never participate in optimization.
+% the dashboard defaults to a simple 20\% random holdout: for a chosen target column, 
 
-\subsection{CSV export and caching}
-After runs, the backend stores a ready-to-download CSV merging original and imputed values. Repeated requests re-use cached results keyed by (session, algorithm, columns, iterations) to accelerate exploratory analysis.
+To study behavior under more structured missingness, we introduce two additional masking presets, enabled via configuration. The \emph{Suppression-like} regime mimics CDC WONDER’s privacy rule by restricting the mask to counties with fewer than 10 deaths (the suppression threshold) and sampling 20\% of these counties. The \emph{Intermediate} regime focuses on mid-sized jurisdictions by selecting counties whose annual death counts fall in an intermediate band (e.g., 10--25 deaths per year) and masking 20\% of them. These regimes stress MNAR-style scenarios in which missingness is tied to outcome magnitude rather than being completely random.
 
-\subsection{Robustness and Error Handling}
-To ensure reliability in diverse deployment environments, the backend implements rigorous data validation and exception handling strategies.
+For each regime and algorithm, the backend records per-entry absolute errors, which underpin both the per-county error plots and the aggregate metrics exposed in the UI (random holdout by default). In our quantitative evaluation (Section~\ref{subsec:iacc}), we summarize performance by averaging per-year MAE across the three regimes to obtain a more holistic view of algorithm behavior across small, intermediate, and general counties.
 
-\paragraph*{Data Preprocessing and Formatting.}
-Upon upload, the system automatically detects CSV delimiters and character encodings to handle heterogeneous file origins. We enforce schema consistency by standardizing critical identifiers; for instance, county FIPS codes are padded with leading zeros to guarantee correct joins with the internal GeoJSON topology. Numeric columns undergo type coercion where non-numeric placeholders common in public health data (e.g., "Suppressed", "*", "N/A") are automatically converted to standard NaN values, preventing downstream type errors.
+In addition to these UI-facing summaries, we compute paired Wilcoxon signed-rank tests offline on the per-entry absolute error differences between algorithm pairs (e.g.\ $\lvert e_i^{\text{gKNN}}\rvert - \lvert e_i^{\text{MICE}}\rvert$ across all masked sets). These statistics are not displayed in the dashboard but complement the visual diagnostics by indicating whether observed differences in MAE are unlikely to arise from random fluctuations. Finally, to probe uncertainty beyond any single holdout mask, we perform a copula-based offline analysis of gKNN on the opioid dataset (Section~\ref{subsec:uncertainty}), using a Gaussian copula~\cite{nelsen2006introduction,joe2014dependence,hollenbach2021multiple} to resample pseudo-missing scenarios and assess the stability and coverage of the resulting imputed rates.
 
-\paragraph*{Exception Handling Strategies.}
-We adopt a defensive programming approach to manage common failure modes:
-\begin{itemize}[leftmargin=*]
-  \item \textbf{Upload Validation.} Files are rejected if they lack essential geospatial identifiers (FIPS/GEOID) or required temporal fields, providing immediate, actionable feedback to the user.
-  \item \textbf{Algorithmic Resilience.} For matrix-based methods like \mice, singular matrix errors trigger a fallback to univariate imputation or ridge regularization. In \gknn, if a county lacks donors within the initial search radius, the algorithm iteratively expands the search window or relaxes socio-economic constraints to ensure coverage.
-  \item \textbf{Visualization Fallbacks.} The front-end renderer handles unmatched counties—often due to outdated shapefiles or FIPS changes—by flagging them in a distinct "Unmatched" category rather than causing a render crash, ensuring the rest of the map remains interactive.
-\end{itemize}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{Geomap_new.png}
+  \caption{Geomap view in ImputeViz for county-level opioid mortality. The choropleth encodes deaths per 100{,}000 for observed and imputed counties, with separate layer toggles. Selecting an imputed county highlights it in green and its gKNN donor counties in blue; clicking also opens the linked donor panel shown in Figure~\ref{fig:donors_list}.}
+  \label{fig:geomap}
+\end{figure}
+
+
+% \subsection{Robustness and Error Handling}
+% To ensure reliability in diverse deployment environments, the backend implements rigorous data validation and exception handling strategies.
+
+% \paragraph*{Data Preprocessing and Formatting.}
+% Upon upload, the system automatically detects CSV delimiters and character encodings to handle heterogeneous file origins. We enforce schema consistency by standardizing critical identifiers; for instance, county FIPS codes are padded with leading zeros to guarantee correct joins with the internal GeoJSON topology. Numeric columns undergo type coercion where non-numeric placeholders common in public health data (e.g., "Suppressed", "*", "N/A") are automatically converted to standard NaN values, preventing downstream type errors.
+
+% \paragraph*{Exception Handling Strategies.}
+% We adopt a defensive programming approach to manage common failure modes:
+% \begin{itemize}[leftmargin=*]
+%   \item \textbf{Upload Validation.} Files are rejected if they lack essential geospatial identifiers (FIPS/GEOID) or required temporal fields, providing immediate, actionable feedback to the user.
+%   \item \textbf{Algorithmic Resilience.} For matrix-based methods like \mice, singular matrix errors trigger a fallback to univariate imputation or ridge regularization. In \gknn, if a county lacks donors within the initial search radius, the algorithm iteratively expands the search window or relaxes socio-economic constraints to ensure coverage.
+%   \item \textbf{Visualization Fallbacks.} The front-end renderer handles unmatched counties—often due to outdated shapefiles or FIPS changes—by flagging them in a distinct "Unmatched" category rather than causing a render crash, ensuring the rest of the map remains interactive.
+% \end{itemize}
+
+% ---------------------------------------------------------------------------
+\vspace{-6pt}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{Imputed_County.png}
+  \vspace{-6pt}
+  \caption{Donor inspection panel in ImputeViz. For the county selected in the geomap (Figure~\ref{fig:geomap}), the panel lists each donor county with its name, GEOID, observed death rate, and status (observed vs.\ imputed), optionally including key socio-economic features used in gKNN’s distance.}
+  \vspace{-8pt}
+  \label{fig:donors_list}
+\end{figure}
+\vspace{-6pt}
 
 % ---------------------------------------------------------------------------
 \section{Front-End Visual Analytics}
 \label{sec:frontend}
-The Next.js front end implements coordinated views for algorithm control, spatial context, and evaluation.
 
-\subsection{Imputation configuration}
-Analysts choose algorithms, targets, and iteration counts through the \textit{Imputation Configuration} panel. The interface surfaces completion status (via `/dataframe/impute/status`), initiates runs, and enables CSV download upon completion.
+ImputeViz exposes the imputation workflow through a coordinated dashboard with seven linked panels (Figure~\ref{fig:teaser}a–g) and an additional geomap view (Figure~\ref{fig:geomap} with \ref{fig:donors_list}). All panels share the same dataset, target, and masking configuration; each can be expanded to full screen for detailed inspection, and an inline info bar describes the purpose of the view. Selecting an algorithm in the configuration panel or in the Method Comparison Summary keeps a single active method in application state; when a run is already cached for that setting, views update from the cache and post-imputation charts retain consistent axis scales across method switches so analysts can compare shapes without mentally rescaling.
 
-\subsection{Choropleth map}
-\emph{MapView} renders the spatial canvas using \texttt{react-simple-maps} atop a TopoJSON derived from the CDC shapefile and simplified with \texttt{topojson-simplify} to keep payloads under 2~MB. We project the geometry with Albers USA to balance continental distortion and minimise occlusion for Alaska and Hawaii, which appear in dedicated inset tiles. County features carry pre-joined FIPS identifiers so the component can cross-reference backend payloads without additional lookups.
+\paragraph*{(a) Data configuration.}
+Analysts begin by uploading a CSV in the \emph{Data Configuration} panel. The table provides a scrollable snapshot of the dataset with per-column sorting, enabling quick sanity checks of column types, ranges, and units. This view underpins all subsequent selection menus in the dashboard.
 
-Colour encodings separate data provenance: observed rates use a five-step neutral ramp, imputed values a sequential Viridis derivative, and masked-but-unresolved counties a muted hatch overlay. When \gknn finishes, donor counties are stroked in navy with opacity proportional to inverse-distance weights, while comparison algorithms (\mice/Benchmarks) adopt teal or orange to reduce ambiguity. A dual-gradient legend blends linear and categorical swatches; it is draggable to accommodate dense metropolitan views.
+\paragraph*{(b) Imputation configuration.}
+The \emph{Imputation Configuration} panel controls algorithm choice and hyperparameters. Users select the target variable, choose among gKNN, MICE, Random Forest, XGBoost, and kNN, set method-specific options (e.g., iteration count), and launch runs via \texttt{Run Imputation}. Switching algorithms reuses cached results when the same target, iterations, and mask already exist in the session, so plots and the comparison table can refresh immediately. Once a run completes, the same panel exposes buttons to open the map view (for spatial targets) and to download the imputed table for external analysis.
 
-Interaction is tuned for epidemiological audit trails. Hover tooltips display county name, current value, donor count, residual, and the active algorithm. Clicking locks the county, disables hover updates for three seconds (or until dismissal), and triggers a detail fetch that populates the neighbour modal and linked charts. Keyboard shortcuts mirror map interactions for accessibility, and a viewport-aware debounce keeps frame rates above 55~FPS on mid-tier laptops even when analysts scrub through multiple counties.
+\paragraph*{(c) Data missingness summary.}
+To characterize where missingness occurs, the \emph{Data Missingness Summary} panel presents a horizontal bar chart of per-feature missing counts, sorted from most to least missing. This view appears immediately after upload and helps analysts choose sensible targets (e.g., avoiding features with almost no observed values) and recognize whether missingness is concentrated in a few attributes or spread across the table.
 
-\subsection{Neighbour modal}
-\textit{GeoMapModal} provides a wider viewport for exploring neighbours. It allows toggling between algorithm outputs, shows donor lists, and details contribution weights from \gknn.
+\paragraph*{(d) Pre-imputation relationships.}
+The \emph{Pre-Imputation Scatter Plot} shows how the chosen target relates to candidate predictors before any imputation is performed. Dropdown menus select the $x$- and $y$-axes and the active target; points are colored by whether the target is observed or missing. This view supports diagnosing potential MNAR patterns (e.g., missing outcomes concentrated in low-population counties) and understanding which covariates are likely to be informative for downstream imputers.
 
-\subsection{Distribution and scatter plots}
-Time-series and distribution views allow analysts to contrast observed versus imputed distributions. Scatter plots showing pre-imputation relationships aid in understanding how candidate predictors relate to missingness.
+\paragraph*{(e) Post-imputation scatter.}
+After a run completes, the \emph{Rest vs Imputed Values} scatter plot overlays original and imputed values. Analysts can select any predictor on the $x$-axis and the target on the $y$-axis, with colors distinguishing observed versus imputed outcomes. Axis ranges are held fixed when switching the active algorithm (for the same target and view) so point clouds remain visually comparable across methods. This makes it easy to see whether imputations respect existing trends (e.g., along a socioeconomic gradient) or introduce visible artifacts such as vertical bands or out-of-range predictions.
 
-\subsection{Evaluation dashboards}
-The UI exposes MAE, RMSE, sample counts, and Wilcoxon statistics once imputation completes. Analysts can compare algorithms side-by-side and justify model selection for reporting.
+\paragraph*{(f) Distributional alignment.}
+The \emph{Histogram} panel compares the marginal distribution of the target before and after imputation. Binned counts for observed and imputed values are shown in distinct colors, revealing whether the imputer oversmooths heavy tails, creates new modes, or fills in rare high-risk regions. Bin ranges and axis limits stay aligned when changing the active algorithm so histograms for different methods are directly comparable. This view is often used in combination with (e) to check that both global and conditional distributions remain plausible.
 
+\paragraph*{(g) Method comparison summary.}
+For configurations with a held-out mask, the \emph{Method Comparison Summary} table lists every algorithm that has been executed in the session for the current target and mask. Each row reports MAE, RMSE, $\Delta$RMSE (difference from the best RMSE among those runs), and wall-clock runtime, enabling at-a-glance ranking and trade-off analysis between accuracy and cost. The row for the active algorithm is visually highlighted and matches the selection in the Imputation Configuration panel; choosing a row (or the algorithm label) updates the active method so the scatter, histogram, and map stay coherent with that choice.
+
+\paragraph*{Geomap and donor inspection.}
+For spatial datasets, the \texttt{Map} button in panel~(b) opens a dedicated geomap view (Figure~\ref{fig:geomap}). The choropleth encodes deaths per 100{,}000 across U.S.\ counties, with independent toggles for observed and imputed layers. Clicking an imputed county highlights it in green and its donor counties in blue; the donor list (Figure~\ref{fig:donors_list}) below the map shows each neighbor’s name, GEOID, observed rate, and status (observed vs imputed). This panel can be configured to also reveal the key socioeconomic features used in gKNN’s blended distance, allowing analysts to relate the target county to its donors along the same attributes that drive the imputation. Together, the map and donor table provide a provenance-rich explanation of each estimate and complement the pre- and post-imputation views and the tabular method comparison in panels~(d)–(g).
+
+\vspace{-6pt}
 % ---------------------------------------------------------------------------
 \section{Case Studies}
-\label{sec:case}
-We collaborated with public-health analysts in New York to evaluate \tool. Each case study involved uploading county overdose data, selecting targets (overdose rate, deaths per 100k), and investigating algorithm outputs.
+\label{sec:case-studies}
 
-\begin{figure*}[tb]
+To illustrate how ImputeViz supports reasoning about different imputation strategies, we present two case studies drawn from the datasets used later in our user study (Section~\ref{sec:user-study}). The first focuses on county-level opioid mortality with strong spatial structure; the second uses a non-geographic telecom churn dataset with purely tabular covariates. Together, they show how the dashboard helps analysts both exploit spatial context when it is informative and recognize when classical or tree-based methods dominate.
+\vspace{-10pt}
+\begin{figure*}[h]
   \centering
-  \includegraphics[width=\linewidth]{GeoMap.png}
-  \\[1ex]
-  % \includegraphics[width=\linewidth]{Imputed_County.png}
-  \caption{Case Study: The GeoMap highlights the target imputed county and its donors (navy) with opacity indicating contribution weight.}
-  % (Bottom) Detailed textual breakdown of the imputation, showing the exact values and weights of the donor counties.
-  \label{fig:case_study}
+  \includegraphics[width=\linewidth]{knn_gknn_wilcoxon.png}
+  \vspace{-8pt}
+  \caption{Case study for prescription-opioid imputation in 2010. (a) Baseline kNN regression, treating overdose rates as a purely tabular prediction problem. (b) gKNN, which blends socio-economic and geographic distance while exposing donor provenance in the dashboard views. (c) Distribution of per-county absolute error differences $|e_\text{gKNN}| - |e_\text{kNN}|$ on the held-out counties. Most mass lies below zero, and a paired Wilcoxon signed-rank test (n = 167, mean diff -0.34 deaths per 100K, p = 0.0396) indicates that gKNN yields lower errors on average.}
+  \label{fig:knn_gknn_wil}
 \end{figure*}
 
-\subsection{Rural county suppression}
-Analysts imputed suppressed rates for low-population rural counties. \gknn highlighted geographically contiguous donors and the modal emphasised spillover from adjacent counties sharing socio-economic profiles. Although \mice produced slightly lower RMSE (2.8 deaths/100k), analysts favoured \gknn when communicating with stakeholders because the donor map aligned with known referral networks.
+\subsection{Spatial opioid mortality: kNN vs gKNN}
+\label{subsec:case-opioid}
+Our first case study revisits the prescription-opioid mortality data for the year 2010, where missing rates primarily arise from privacy suppression in sparsely populated counties. Figure~\ref{fig:knn_gknn_wil} juxtaposes three views of the same 20\% held-out mask. Panel~(a) shows baseline kNN regression, which treats overdose rates as a purely tabular prediction problem over socio-economic covariates only. Panel~(b) shows gKNN under the same masking, blending socioeconomic similarity with haversine geographic distance and exposing donor provenance in the map view.
 
-\subsection{Urban cluster anomalies}
-In urban clusters, \mice exposed outlier counties with atypical demographic mixes, prompting analysts to inspect \gknn residuals. The evaluation dashboard revealed where \gknn over-smoothed across metropolitan boundaries, while the neighbour modal explained why suburban contributors dominated. Analysts flagged these cases for offline review with Random Forest before briefing health commissioners.
+Qualitatively, the kNN choropleth in Figure~\ref{fig:knn_gknn_wil}(a) tends to over-smooth high-risk clusters: held-out counties in the Appalachian region and parts of the Midwest are often pulled toward milder regional averages, and the donor tooltips reveal that many predictions draw from distant counties with similar covariates but little spatial relevance. In contrast, gKNN in Figure~\ref{fig:knn_gknn_wil}(b) concentrates donor sets in spatially adjacent counties with similar socioeconomic profiles, and several suppressed counties recover elevated rates that better align with their neighbors. The provenance view makes this behavior explicit: analysts can see exactly which neighbors drive each imputation and how much weight each donor contributes.
 
-\subsection{Exporting for reporting}
-After vetting, analysts downloaded imputed CSVs tagged by algorithm. Integration with downstream R workflows allowed incorporation into overdose dashboards and grant applications.
+Panel~(c) of Figure~\ref{fig:knn_gknn_wil} summarizes the per-county absolute error differences between the two methods on the held-out mask, plotting $|e_\text{gKNN}| - |e_\text{kNN}|$ for each county. Most mass lies below zero, indicating that gKNN yields smaller errors for a majority of counties. A paired Wilcoxon signed-rank test on these differences ($n = 167$, mean diff $-0.34$ deaths per 100{,}000, median $-0.38$, $W = 5726$, $p \approx 0.0396$) confirms that the improvement is statistically significant rather than an artifact of a few outliers. In practice, this case study shows how ImputeViz helps analysts justify preferring gKNN over a non-spatial baseline when spatial autocorrelation is strong and donor geography matters.
 
+Beyond aggregate metrics, ImputeViz lets analysts interrogate individual counties in spatial context. In the 2010 prescription-opioid map (Figure~\ref{fig:geomap}), observed counties are shown in yellow/orange and imputed ones in lighter tones; analysts can independently toggle these layers and click any imputed county to highlight it in green while its donors are highlighted in blue. Selecting Fremont County, WY (imputed at 1.71 deaths per 100{,}000) immediately reveals a donor set drawn from nearby Utah and Colorado counties with substantially higher observed rates (e.g., Tooele 7.80, Weber 8.32, Davis 8.26, El Paso 3.72). The donor panel below the map lists each donor with its GEOID, status, and outcome (Figure~\ref{fig:donors_list}), and can be configured to expose the key socioeconomic features used in gKNN’s blended distance. This side-by-side view makes the basis of the imputation explicit: analysts can see which neighbors drove the estimate, judge whether the socioeconomic similarity justifies borrowing from those donors, and flag cases like Fremont where gKNN may be underestimating risk for further review or parameter adjustment.
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=\linewidth]{mice_rf_wilc.pdf}
+  \vspace{-8pt}
+  \caption{Non-geographic case study on a telecom churn dataset. (a) MICE chained-equations baseline, which struggles to capture the non-linear structure in the data. (b) Random Forest regression under the same split, yielding substantially smaller residuals on the held-out records. (c) Distribution of per-row absolute error differences $|e_\text{MICE}| - |e_\text{RF}|$ on the held-out rows. Almost all mass lies above zero, and a paired Wilcoxon signed-rank test ($n = 43$, mean diff $21.9$, median $18.9$, $W = 40$, $p \approx 2.0\times10^{-9}$) shows that Random Forest decisively outperforms MICE in this scenario.}
+  \vspace{-8pt}
+  \label{fig:mice_rf_wil}
+\end{figure*}
+
+\vspace{-6pt}
+\subsection{Telecom churn: MICE vs Random Forest}
+\label{subsec:case-telecom}
+
+The second case study focuses on a purely tabular problem to highlight how ImputeViz behaves when no spatial structure is present. We use the telecom churn dataset described in Section~\ref{sec:data} (212 customers after dropping rows with missing target), and treat the continuous \texttt{Offer} field as the outcome for a 20\% held-out subset.
+
+Figure~\ref{fig:mice_rf_wil} again shows three coordinated views. Panel~(a) visualizes residual structure for MICE (IterativeImputer with ridge regression chains). Despite the flexibility of chained equations, MICE struggles in this setting: residual plots and summary statistics in the dashboard reveal large systematic errors on the held-out rows. Panel~(b) displays the same mask under a Random Forest regressor. Here the residual view tightens substantially, and the error summary panel reports a mean absolute error of 2.84 compared to 24.78 for MICE under the same split.
+
+Panel~(c) makes this contrast explicit by plotting per-row absolute error differences $|e_\text{MICE}| - |e_\text{RF}|$ for all held-out records. Almost all mass lies above zero, indicating that MICE is consistently worse than Random Forest on this dataset. A paired Wilcoxon signed-rank test ($n = 43$, mean diff $21.9$, median $18.9$, $W = 40$, $p \approx 2.0\times 10^{-9}$) shows that this gap is not only large in magnitude but also highly significant. From the analyst’s perspective, ImputeViz makes it clear that, in this non-geographic churn scenario, a tree-based model is far more appropriate than MICE, and the system does not privilege gKNN or any single algorithm a priori.
+
+
+These case studies show that ImputeViz can both surface the benefits of spatially aware methods when geography carries signal and, equally importantly, steer analysts toward simpler or non-spatial methods when they dominate. The same datasets (and a third public health panel) are reused in our user study tasks, where participants interact with the dashboard to diagnose missingness, compare methods, and interpret donor provenance and error summaries.
 % ---------------------------------------------------------------------------
 \section{Evaluation}
 \label{sec:evaluation}
-We assess \tool along three axes: imputation accuracy, performance, and usability.
-
-\subsection{Imputation accuracy}
-Using the 20\% holdout approach, we benchmark algorithms across 3,107 counties using the dataset of 2000--2022 for prescription opioids. Table~\ref{tab:metrics} summarises performance across three evaluation settings: \emph{Suppression-like (Supp.)}, where we mask low-population counties to mimic privacy suppression; \emph{Intermediate range (Interm.)}, covering mid-sized counties; and \emph{Random holdout (Random)}, a standard 20\% random mask, plus the pooled Overall average. \gknn delivers the lowest RMSE while retaining explicit donor provenance. \mice trails with higher error but remains competitive for counties lacking strong spatial signal. Benchmark models like XGBoost and Random Forest approach \gknn accuracy but lack the explicit spatial provenance provided by our method.
-
-A deeper analysis reveals that \gknn outperforms \mice most significantly in regions with high spatial autocorrelation (Moran's \(I > 0.4\)), such as the Appalachian opioid belt. In these clusters, the geographic weighting effectively borrows strength from neighbors. Conversely, in scattered missingness scenarios where spatial signal is weak, \mice's multivariate approach proves robust, highlighting the value of our system's multi-model support.
-
-% \begin{table}[ht]
-%   \centering
-%   \caption{Median holdout metrics (2022 county overdose rates).}
-%   \label{tab:metrics}
-%   \begin{tabular}{@{}lcccc@{}}
-%     \toprule
-%     Algorithm & MAE (\(\downarrow\)) & RMSE (\(\downarrow\)) & n samples & Wilcoxon p \\
-%     \midrule
-%   \gknn        & \textbf{2.2}  & \textbf{3.1} & 610 & \textbf{0.078} \\
-%   \mice        & 2.5  & 3.5 & 618 & 0.041 \\
-%   BART        & 2.3  & 3.3 & 120 & 0.062 \\
-%     \bottomrule
-%   \end{tabular}
-% \end{table}
+We evaluate \tool along three axes: imputation accuracy, usability, and uncertainty. For accuracy, we benchmark gKNN against MICE, Random Forest, XGBoost, and linear/kNN baselines and use paired Wilcoxon signed-rank tests on per-entry absolute error differences (visualized for selected cases in Figures~\ref{fig:knn_gknn_wil} and~\ref{fig:mice_rf_wil}). We then report a small analyst usability study with three datasets, and complement both with offline copula-based uncertainty analysis that quantifies coverage and interval widths beyond the dashboard’s interactive holdout metrics and method comparison table.
 
 \begin{table}[ht]
   \centering
-  \caption{Average MAE (2000--2022) for prescription opioids across three evaluation settings: suppression-like (Supp.), intermediate range (Interm.), and random holdout (Random), plus the pooled Overall average. Lower is better.}
+  \caption{Average MAE (2000--2022) for prescription opioids across three evaluation settings: suppression-like (Supp.), intermediate range (Interm.), and random 20\% holdout (Random), plus the pooled Overall average.}
   \label{tab:metrics}
-  \begin{tabular}{@{}lcccccccc@{}}
+  \begin{tabular}{@{}lcccc@{}}
     \toprule
-    & \multicolumn{4}{c}{Prescription (MAE)} \\
-    \cmidrule(lr){2-5} \cmidrule(l){6-9}
     Method & Supp. & Interm. & Random & Overall \\
     \midrule
     Linear Regression & 4.07 & 2.91 & 2.88 & 3.28 \\
-    kNN Regression & 3.86 & 3.18 & 2.81 & 3.28 \\
-    Random Forest & 4.18 & 2.92 & 2.79 & 3.30 \\
-    MICE \cite{VanBuuren2018MICE} & 4.05 & 3.06 & 2.88 & 3.33 \\
-    XGBoost & 4.21 & 3.19 & 3.00 & 3.46  \\
-    \textbf{\gknn (Ours)} & \textbf{3.47} & \textbf{2.76} & \textbf{2.66} & \textbf{2.96} \\
+    kNN Regression    & 3.86 & 3.18 & 2.81 & 3.28 \\
+    Random Forest     & 4.18 & 2.92 & 2.79 & 3.30 \\
+    MICE              & 4.05 & 3.06 & 2.88 & 3.33 \\
+    XGBoost           & 4.21 & 3.19 & 3.00 & 3.46 \\
+    \textbf{\gknn}    & \textbf{3.47} & \textbf{2.76} & \textbf{2.66} & \textbf{2.96} \\
     \bottomrule
   \end{tabular}
 \end{table}
+\vspace{-8pt}
 
-\subsection{Performance}
-Front-end interaction remains fluid: the map, choropleth, and evaluation panels update in under 200 ms after imputation completes. \gknn runs in 35~s on the 2022 dataset because of Bayesian parameter search; cached results reduce repeat runs to milliseconds. \mice completes in 18~s per run. Benchmark algorithms (XGBoost, Random Forest, KNN) run in comparable time to \gknn, allowing for interactive comparison.
+\subsection{Imputation accuracy}
+\label{subsec:iacc}
 
-\subsection{Qualitative Evaluation}
-To assess usability and workflow fit, we conducted a summative evaluation with four public health analysts (P1--P4). Sessions lasted 60 minutes and involved a "think-aloud" protocol while performing standard imputation tasks. We analyzed the transcripts using thematic analysis.
+Using the masking protocol from Section~\ref{subsec:eval_protocol}, we benchmark all algorithms across 3{,}107 counties on the prescription-opioid datasets (2000--2022). For each year, models are fit and evaluated independently with no information sharing across time; Table~\ref{tab:metrics} reports MAE averaged over these yearly runs for three regimes: \emph{Suppression-like (Supp.)}, \emph{Intermediate range (Interm.)}, and \emph{Random}. In the dashboard, the random regime is used by default, while others can be enabled to stress more MNAR-like scenarios.
 
-\paragraph*{Theme 1: Trust through Provenance.}
-All participants cited the "Neighbour Modal" as the most critical feature for building trust. P2 noted, "Usually I just get a number and hope it's right. Seeing exactly which counties contributed and by how much makes me confident to defend this number to my director." The transparency of the \gknn weights transformed the imputation from a statistical abstraction into a verifiable geographic narrative.
+Our goal is not to identify a universally best algorithm, but to provide a unified, interpretable workspace in which actively used methods can be compared under consistent masking. Within this setting, \gknn{} achieves the lowest MAE in all three regimes, with an Overall average of 2.96 deaths per 100{,}000 versus 3.28--3.33 for linear regression, vanilla kNN, random forest, and MICE, and 3.46 for XGBoost. Gains are most pronounced in the suppression-like regime, where incorporating geography reduces MAE by roughly 10--15\% relative to other baselines. The absolute differences are modest but practically relevant for public-health reporting, and, unlike tree ensembles or standard kNN, \gknn{} also exposes donor provenance in the interface. Paired Wilcoxon signed-rank tests on per-entry absolute error differences (visualized in Figure~\ref{fig:knn_gknn_wil}) confirm that these improvements are statistically significant in typical settings, while the multi-model dashboard allows analysts to adopt simpler non-spatial methods when they perform comparably.
+\vspace{-8pt}
 
-\paragraph*{Theme 2: Workflow Integration.}
-Participants appreciated the seamless transition from diagnosis to export. P4 remarked that the ability to "test, check, and then download" saved hours of manual scripting. The export tagging feature was particularly praised for maintaining an audit trail, a requirement for federal grant reporting.
+\subsection{Usability Evaluation}
+\label{sec:user-study}
 
-\paragraph*{Theme 3: Visual Clarity vs. Complexity.}
-While the dual-gradient map was initially challenging for P1, they quickly adapted after using the interactive legend. P3 suggested adding confidence intervals directly to the map glyphs, a feature we noted for future work. Overall, the balance between rich diagnostic data and clean visual presentation was rated highly, with a System Usability Scale (SUS) score of 82, indicating "excellent" usability.
+We conducted a formative usability study of \tool with seven participants (P1--P7) from our university. All were graduate students in computer science or related data-focused programs with prior experience in data analysis or machine learning. Each session followed the main \tool workflow: (i) inspecting missingness and selecting a target variable, (ii) configuring and running multiple imputation methods (gKNN, MICE, Random Forest, XGBoost, kNN), (iii) exploring spatial patterns via the choropleth map and neighbor-details popup, and (iv) comparing methods using the Method Comparison Summary (MAE, RMSE, $\Delta$RMSE, runtime) together with linked distribution plots on two case-study datasets (opioid mortality and telecom churn). These tasks were selected to align directly with our design goals (DG1–DG4). After completing the tasks, participants filled out an anonymous online questionnaire.
 
+We first assessed overall usability using the System Usability Scale (SUS, Q1--Q10). The mean SUS score was \textbf{75.4} (SD = 15.8, $N = 7$), which lies in the ``good'' usability range, indicating that participants generally found the dashboard easy to learn and operate.
+
+% \vspace{-6pt}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth,trim=0 15 0 0,clip]{usability_q11_15.pdf}
+  \vspace{-6pt}
+  \caption{Task-specific ratings (Q11--Q15).}
+  \vspace{-6pt}
+  \label{fig:usability-results}
+\end{figure}
+\vspace{-4pt}
+
+Five additional Likert items (Q11--Q15; Figure~\ref{fig:usability-results}) captured task-specific perceptions of configurability, visual clarity, and trust in gKNN. Participants strongly agreed that it was easy to configure and run different imputation methods from the Imputation Configuration panel, and that the linked visualizations (choropleth map, histograms, scatterplots, and the cross-method comparison table) made it easy to compare imputed and original values (median = 5/5 for both). The map and neighbor-details popup were also rated very positively for explaining why specific counties received their imputed values and for building trust in gKNN (median = 5/5). Evaluation panels showing MAE, RMSE, $\Delta$RMSE, and runtime were slightly lower but still well rated (median = 4/5), suggesting that most participants could interpret the performance summaries without difficulty. When asked which imputation method they would use in their own analysis of similar data (Q16), six of seven participants selected gKNN as their preferred method, and one selected MICE.
+
+Free-text responses (Q17--Q19) further contextualize these ratings. Several participants cited the neighbour-details popup and U.S.\ map as the most helpful components for understanding and justifying gKNN imputations, noting that donor counties and their values appeared plausible and often followed local patterns. Others highlighted the evaluation plots and result matrix as important for gaining confidence in the methods. Suggestions for improvement focused on presentation and interaction rather than core functionality, including making some visualizations more informative and polished, adopting a more color-blind-friendly palette with an optional dark theme, and improving interaction smoothness (e.g., zoom responsiveness) and imputation runtime.
+
+\vspace{-6pt}
+\subsection{Uncertainty analysis (copula-based experiment)}
+\label{subsec:uncertainty}
+The holdout protocol in Section~\ref{subsec:eval_protocol} characterizes reconstruction error but does not directly quantify uncertainty in the imputed rates. To obtain a complementary view, we ran an offline copula- based uncertainty analysis focusing on gKNN for the prescription- opioid dataset. Copulas provide a flexible way to model multivariate dependence structures separately from marginal distributions \cite{nelsen2006introduction,joe2014dependence}. Following work on Gaussian copula imputation \cite{hollenbach2021multiple}, we approximate the joint distribution of overdose rates and the selected socioeconomic features and use this model to generate synthetic pseudo-missing scenarios.
+
+For a representative configuration (year 2010), we consider several conditional sampling strategies that reflect different assumptions about how outcomes relate to covariates. When overdose rates are sampled conditional on socioeconomic covariates alone or on both socioeconomic and geographic covariates, gKNN achieves mean absolute errors around 4 deaths per 100{,}000 with average 95\% interval widths close to 21 deaths per 100{,}000, while empirical coverage remains above 91\%. In a more challenging geography- only scenario, errors increase (MAE $\approx 5.8$), intervals widen (average width $\approx 35.5$ deaths per 100{,}000), and coverage drops slightly to about 90\%, reflecting a modest distributional shift when socio-economic structure is ignored.
+
+To approximate behavior in suppressed counties where the true rates are unobserved, we also evaluate gKNN against synthetic proxy outcomes generated conditional on covariates. In this setting, gKNN achieves MAE of roughly 7.1 deaths per 100{,}000, with average interval widths near 22 deaths per 100{,}000 and empirical coverage around 92\%. As expected, errors are larger than on known holdouts, but intervals remain well calibrated and appropriately wider, which supports cautious interpretation: the copula-based analysis both highlights high-variance counties where uncertainty is substantial and indicates that gKNN’s imputed distributions are reasonably stable under resampling.
+
+Because this copula procedure is computationally expensive and currently implemented as an offline batch script, we do not expose it in the interactive dashboard. Instead, we treat it as a complementary robustness check for our main geospatial method. Extending this uncertainty analysis to other algorithms (e.g., MICE, Random Forest, XGBoost) and integrating lighter-weight uncertainty cues into the UI are important directions for future work.
+\vspace{-4pt}
 % ---------------------------------------------------------------------------
 \section{Discussion}
 \label{sec:discussion}
-\tool bridges the gap between advanced imputation models and interpretable, actionable analytics. Critical design lessons include: (i) preserving algorithm provenance~\cite{Ragan2016}---the UI must reveal why specific donors influence imputations; (ii) aligning visual encodings with epidemiological terminology; and (iii) supporting offline workflows via CSV export.
 
-Limitations include reliance on county-level socio-economic covariates, which may lag in availability; future versions could ingest hospital admissions or EMS data. Memory constraints of in-browser rendering limit data size, though county-level datasets remain tractable.
+\tool is intended less as a single new imputation algorithm and more as a unified, provenance-rich workspace for comparing methods that analysts already rely on. Through our collaboration with public-health researchers, three design lessons emerged: (i) preserving algorithm provenance~\cite{Ragan2016} by exposing donor sets and their weights so that estimates can be explained, not just reported; (ii) aligning encodings and terminology with epidemiological practice (e.g., deaths per 100{,}000, suppression-like regimes) rather than generic ML jargon; and (iii) supporting offline workflows via CSV export so that imputed tables and diagnostics can be archived, audited, and reused in external tools.
+
+Our quantitative evaluation is deliberately scoped. On the accuracy side, we focus on a single spatial domain (county-level prescription-opioid mortality) but span 23 yearly panels (2000--2022) and three masking regimes, complemented by a non-spatial telecom dataset. Paired Wilcoxon signed-rank tests on per-entry absolute error differences, together with the case-study figures, show that gKNN typically performs competitively or better than standard baselines in settings where geography carries signal, while avoiding a “one winner” narrative by keeping MICE and tree ensembles in the same workspace. On the uncertainty side, our copula-based analysis currently targets gKNN on the opioid use case; this is sufficient to illustrate how coverage and interval widths complement the dashboard’s holdout-error and tabular comparison views. A fuller assessment would extend similar resampling-based analyses to additional algorithms and domains.
+
+Several limitations suggest directions for future work. \tool currently relies on county-level socioeconomic covariates, which may lag in availability; incorporating timelier sources such as hospital admissions or EMS data could improve both modeling and interpretation. Our baseline set reflects methods our collaborators routinely use and does not yet cover recent spatiotemporal and diffusion-based imputers; broader benchmarking would help situate gKNN and the dashboard within the wider imputation literature. Finally, in-browser rendering constrains the size of datasets we can handle comfortably; scaling to finer spatial resolutions will likely require level-of-detail strategies or server-side rendering.
 
 \paragraph*{Generalizability.}
-While designed for opioid surveillance, \tool's architecture is agnostic to the underlying phenomenon. The \gknn approach is applicable to any spatio-temporal dataset where local geography and attribute similarity drive values, such as environmental monitoring (e.g., air quality sensors), crime statistics, or infectious disease tracking. The modular backend allows for easy swapping of feature sets, making the system adaptable to new domains with minimal refactoring.
+Although motivated by opioid surveillance, \tool's architecture is agnostic to the underlying phenomenon. The gKNN geospatial extension applies to any setting where local geography and attribute similarity drive values (e.g., environmental monitoring, crime statistics, infectious disease). For purely tabular domains, the same panels can be used without the map view, as shown in our telecom case study. The modular backend allows new feature sets and imputation algorithms to be swapped in with minimal refactoring, suggesting that a provenance-focused imputation dashboard can generalize well beyond the datasets studied here.
 
+\vspace{-4pt}
 % ---------------------------------------------------------------------------
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
-Opioid surveillance depends on filling the systematic gaps that arise from privacy suppression and uneven reporting. \tool tackles this challenge by pairing our geographic \gknn imputation algorithm with a transparent analytics environment, demonstrating that analysts can simultaneously improve accuracy and trust through provenance-rich visual context. Across CDC county archives, we observed how the blend of socio-economic and spatial cues yields lower error while the interface keeps donor rationale legible---a combination that matters when allocating limited public-health resources.
 
-Looking ahead, we plan to broaden validation with additional states, tribal regions, and time spans to stress-test \gknn under shifting socio-economic conditions. Integrating near-real-time feeds (e.g., EMS dispatches, prescription monitoring) will further test the generality of our optimisation strategy. Finally, we are preparing pilot deployments with county health departments to evaluate workflow fit, governance requirements, and impact on downstream reporting. These steps will move \tool from a research prototype toward an operational decision-support platform.
+%Opioid surveillance depends on filling systematic gaps created by privacy suppression and uneven reporting. 
+Reliable analysis often depends on filling systematic gaps created by privacy suppression, incomplete reporting, and heterogeneous missingness. \tool addresses this challenge by combining a transparent visual analytics environment with a small library of imputation models, including a geographic kNN extension (\gknn) that blends features with geospatial references—such as socioeconomic variables and spatial proximity—while keeping donor rationale legible. Our experiments covered both a public-health dataset (county-level opioid mortality) and a non-spatial telecom dataset, but the findings extend beyond these domains. Together with a formative usability study, these experiments suggest that analysts can use ImputeViz to both improve accuracy in realistic settings and build trust by inspecting donor provenance, distributions, and error summaries rather than treating imputations as black boxes. Our findings generalize beyond public health, as missingness and provenance challenges occur in many domains.
+
+In future work we are particularly interested in applications in public health, but we also see opportunities to generalize these extensions to other domains where missingness and provenance reasoning matter—such as environmental monitoring, mobility analytics, or administrative data. We plan to broaden validation across additional regions and datasets, including tribal areas and other public health panels, and to extend our uncertainty analysis beyond gKNN to alternative imputers. Integrating timelier data sources (e.g., EMS dispatches, prescription monitoring programs) will further test the robustness of our workflow and visual encodings. Finally, we are preparing pilot deployments with county health departments to evaluate workflow fit, governance requirements, and the impact on downstream reporting, thereby evolving \tool from a research prototype into an operational decision-support component within existing surveillance infrastructures.
+
+\vspace{-6pt}
+\section*{Acknowledgments}
+Portions of this manuscript were refined with assistance from ChatGPT-5.1 to improve clarity, structure, and wording. All conceptual contributions, system design decisions, analyses, and substantive content originated from the authors.
 
 % ---------------------------------------------------------------------------
 % \section*{Acknowledgements}
 % We thank the Suffolk County Department of Health and the CDC for open data resources. This work was supported by the Stony Brook University AI Institute seed grant.
 
-\begin{thebibliography}{99}
-\bibitem{Waller2016BayesianSmallArea}
-\textsc{Waller, L. A., Gotway, C. A.}: \emph{Applied Spatial Statistics for Public Health Data}. Wiley, 2016.
+\newpage
 
-\bibitem{Lu2017SpatialKNN}
-\textsc{Lu, F., et al.}: Spatially Constrained KNN for Health Data Imputation. \emph{International Journal of Health Geographics}, 2017.
-
-\bibitem{VanBuuren2018MICE}
-  \textsc{van Buuren, S.}: \emph{Flexible Imputation of Missing Data}. Chapman \& Hall/CRC, 2018.
-
-\bibitem{Chen2016XGBoost}
-\textsc{Chen, T., Guestrin, C.}: XGBoost: A Scalable Tree Boosting System. \emph{KDD}, 2016.
-
-\bibitem{Breiman2001RandomForest}
-\textsc{Breiman, L.}: Random Forests. \emph{Machine Learning} 45(1):5--32, 2001.
-
-\bibitem{Cover1967KNN}
-\textsc{Cover, T., Hart, P.}: Nearest neighbor pattern classification. \emph{IEEE Transactions on Information Theory} 13(1):21--27, 1967.
-
-
-
-\bibitem{Ghosh2019OpioidAtlas}
-\textsc{Ghosh, A., et al.}: Opioid Atlas: Mapping the Uneven Geography of the U.S. Overdose Epidemic. \emph{IEEE VIS}, 2019.
-
-\bibitem{Carroll2014HealthVis}
-\textsc{Carroll, L. N., et al.}: Visualization and Analysis Tools for the National Syndromic Surveillance Program. \emph{MMWR Supplements} 63(6):25--38, 2014.
-
-\bibitem{Kwon2016DPMHU}
-\textsc{Kwon, B. C., et al.}: Visual Analytics for Exploring Uncertainty in Model Predictions. \emph{IEEE Transactions on Visualization and Computer Graphics} 22(1):210--219, 2016.
-
-\bibitem{Hullman2019Uncertainty}
-\textsc{Hullman, J.}: Why Authors Don't Visualize Uncertainty. \emph{IEEE Transactions on Visualization and Computer Graphics} 26(1):130--139, 2020.
-
-\bibitem{Potter2012Ensemble}
-\textsc{Potter, K., et al.}: Ensemble-Vis: A Framework for the Statistical Visualization of Ensemble Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 17(12):2999--3007, 2012.
-
-\bibitem{Hullman2015Hypothetical}
-\textsc{Hullman, J., Adar, E.}: Hypothetical Outcome Plots. \emph{IEEE Transactions on Visualization and Computer Graphics} 17(12):2999--3007, 2015.
-
-\bibitem{Correll2018Considerations}
-\textsc{Correll, M., Gleicher, M.}: Considerations for Visualizing Missing Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 24(1): 453--462, 2018.
-
-\bibitem{LittleRubin2019}
-\textsc{Little, R. J., Rubin, D. B.}: \emph{Statistical Analysis with Missing Data}, 3rd edn. Wiley, 2019.
-
-\bibitem{SongSzafir2018}
-\textsc{Song, H., Szafir, D. A.}: Where's My Data? Evaluating Visualizations of Missing Data. \emph{IEEE Transactions on Visualization and Computer Graphics} 25(1):914--924, 2019.
-
-\bibitem{Ragan2016}
-\textsc{Ragan, E. D., et al.}: Characterizing Provenance in Visualization and Data Analysis: An Organizational Framework of Analytic Approaches. \emph{IEEE Transactions on Visualization and Computer Graphics} 22(1):31--40, 2016.
-
-\bibitem{Endert2017}
-\textsc{Endert, A., et al.}: The State of the Art in Integrating Machine Learning into Visual Analytics. \emph{Computer Graphics Forum} 36(8):458--486, 2017.
-
-\bibitem{Gleicher2011}
-\textsc{Gleicher, M., et al.}: Visual Comparison for Information Visualization. \emph{Information Visualization} 10(4):289--309, 2011.
-
-\end{thebibliography}
+\bibliographystyle{eg-alpha}      % or eg-alpha-doi if the template suggests it
+\bibliography{gknn}               % gknn.bib (no .bib extension)
 
 \end{document}

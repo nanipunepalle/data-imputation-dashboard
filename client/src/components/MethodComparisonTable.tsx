@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Table, Spin } from 'antd';
 import ChartWrapper from '@/components/ChartWrapper';
 import { useDatasetStore } from '@/store/useDataStore';
 import { fetchComparisonTable } from '@/services/apiService';
+import styles from '@/styles/MethodComparisonTable.module.css';
 
 interface ComparisonRow {
   algorithm: string;
@@ -14,7 +15,7 @@ interface ComparisonRow {
 }
 
 const MethodComparisonTable: React.FC<{ inModal?: boolean }> = ({ inModal }) => {
-  const { dataset, isUpdated, setSelectedAlgorithm } = useDatasetStore();
+  const { dataset, isUpdated, selectedAlgorithm, setSelectedAlgorithm } = useDatasetStore();
   const [comparisonData, setComparisonData] = useState<ComparisonRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -32,8 +33,27 @@ const MethodComparisonTable: React.FC<{ inModal?: boolean }> = ({ inModal }) => 
   };
 
   const handleAlgorithmClick = (algorithm: string) => {
-    setSelectedAlgorithm(algorithm);
+    // Normalize algorithm name to match the sidebar format
+    const normalized = normalizeAlgorithmName(algorithm);
+    setSelectedAlgorithm(normalized);
   };
+
+  // Normalize algorithm names to handle case sensitivity
+  const normalizeAlgorithmName = (name: string): string => {
+    const mapping: Record<string, string> = {
+      'mice': 'MICE',
+      'gknn': 'gKNN',
+      'random forest': 'Random Forest',
+      'xgboost': 'XGBoost',
+      'knn regressor': 'KNN Regressor',
+    };
+    return mapping[name.toLowerCase()] || name;
+  };
+
+  const normalizedSelectedAlgorithm = useMemo(() => {
+    if (!selectedAlgorithm) return null;
+    return normalizeAlgorithmName(selectedAlgorithm);
+  }, [selectedAlgorithm]);
 
   // Fetch on mount
   useEffect(() => {
@@ -47,25 +67,50 @@ const MethodComparisonTable: React.FC<{ inModal?: boolean }> = ({ inModal }) => 
     }
   }, [dataset, isUpdated]);
 
+  const bestRmse = useMemo(() => {
+    const validRmseValues = comparisonData
+      .map((row) => row.rmse)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+    if (!validRmseValues.length) {
+      return null;
+    }
+
+    return Math.min(...validRmseValues);
+  }, [comparisonData]);
+
   const columns = [
     {
       title: 'Algorithm',
       dataIndex: 'algorithm',
       key: 'algorithm',
-      render: (text: string) => (
-        <span 
-          style={{ 
-            fontWeight: 600, 
-            textTransform: 'capitalize', 
-            color: '#1890ff',
-            cursor: 'pointer',
-            textDecoration: 'underline'
-          }}
-          onClick={() => handleAlgorithmClick(text)}
-        >
-          {text}
-        </span>
-      ),
+      render: (text: string) => {
+        const normalizedRowAlgorithm = normalizeAlgorithmName(text);
+        const isActive = normalizedSelectedAlgorithm === normalizedRowAlgorithm;
+
+        return (
+          <div className={styles.algorithmCell}>
+            <span className={`${styles.activeDot} ${isActive ? styles.activeDotVisible : ''}`}>●</span>
+            <span
+              className={styles.algorithmLink}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAlgorithmClick(text);
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleAlgorithmClick(text);
+                }
+              }}
+            >
+              {text}
+            </span>
+          </div>
+        );
+      },
     },
     {
       title: 'MAE',
@@ -79,6 +124,19 @@ const MethodComparisonTable: React.FC<{ inModal?: boolean }> = ({ inModal }) => 
       dataIndex: 'rmse',
       key: 'rmse',
       render: (value: number) => value?.toFixed(4) ?? 'N/A',
+      sorter: (a: ComparisonRow, b: ComparisonRow) => a.rmse - b.rmse,
+    },
+    {
+      title: 'ΔRMSE',
+      key: 'delta_rmse',
+      render: (_: unknown, record: ComparisonRow) => {
+        if (bestRmse === null || typeof record.rmse !== 'number' || !Number.isFinite(record.rmse)) {
+          return 'N/A';
+        }
+
+        const delta = record.rmse - bestRmse;
+        return `${delta >= 0 ? '+' : ''}${delta.toFixed(4)}`;
+      },
       sorter: (a: ComparisonRow, b: ComparisonRow) => a.rmse - b.rmse,
     },
     {
@@ -100,6 +158,7 @@ const MethodComparisonTable: React.FC<{ inModal?: boolean }> = ({ inModal }) => 
   return (
     <ChartWrapper
       title="Method Comparison Summary"
+      tooltipContent="Comparison of MAE, RMSE, ΔRMSE, and runtime across all executed imputation algorithms"
     //   description="Comparison of MAE, RMSE, and runtime across all executed imputation algorithms"
       inModal={inModal}
     >
@@ -116,6 +175,14 @@ const MethodComparisonTable: React.FC<{ inModal?: boolean }> = ({ inModal }) => 
           size="middle"
           bordered
           style={{ marginTop: '16px' }}
+          rowClassName={(record: ComparisonRow) => {
+            const normalizedRowAlgorithm = normalizeAlgorithmName(record.algorithm);
+            const isActive = normalizedSelectedAlgorithm === normalizedRowAlgorithm;
+            return isActive ? styles.activeRow : '';
+          }}
+          onRow={(record: ComparisonRow) => ({
+            onClick: () => handleAlgorithmClick(record.algorithm),
+          })}
         />
       )}
     </ChartWrapper>

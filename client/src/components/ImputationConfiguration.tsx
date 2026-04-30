@@ -29,8 +29,7 @@ const algorithmDurations: Record<string, number> = {
 };
 
 const ImputationConfiguration: React.FC = () => {
-    const { dataset, setUpdated, isUpdated, resetCharts, selectedAlgorithm: storeSelectedAlgorithm, setSelectedAlgorithm: setStoreSelectedAlgorithm } = useDatasetStore();
-    const [selectedAlgorithm, setSelectedAlgorithm] = useState('MICE');
+    const { dataset, setUpdated, isUpdated, resetCharts, selectedAlgorithm, setSelectedAlgorithm } = useDatasetStore();
     const [type, setType] = useState<'Single' | 'Multiple'>('Single');
     const [target, setTarget] = useState<string | string[] | undefined>();
     const [maxIteration, setMaxIteration] = useState<number | null>(25);
@@ -38,6 +37,23 @@ const ImputationConfiguration: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [columns, setColumns] = useState<string[]>([]);
     const [imputationReady, setImputationReady] = useState(false); // ✅ controls Map visibility
+
+    // Use store value with fallback
+    const currentAlgorithm = selectedAlgorithm || 'MICE';
+
+    // Normalize algorithm name for consistent comparison
+    const normalizeAlgorithmName = (name: string): string => {
+        const mapping: Record<string, string> = {
+            'mice': 'MICE',
+            'gknn': 'gKNN',
+            'random forest': 'Random Forest',
+            'xgboost': 'XGBoost',
+            'knn regressor': 'KNN Regressor',
+        };
+        return mapping[name.toLowerCase()] || name;
+    };
+
+    const normalizedCurrentAlgorithm = normalizeAlgorithmName(currentAlgorithm);
 
     const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
 
@@ -108,24 +124,15 @@ const ImputationConfiguration: React.FC = () => {
         }
     }, [columns, type]);
 
-    // Listen to algorithm selection from store (e.g., from Method Comparison Table click)
-    useEffect(() => {
-        if (storeSelectedAlgorithm && storeSelectedAlgorithm !== selectedAlgorithm) {
-            setSelectedAlgorithm(storeSelectedAlgorithm);
-            // Clear the store value after applying it
-            setStoreSelectedAlgorithm('');
-        }
-    }, [storeSelectedAlgorithm]);
-
     // Check imputation status whenever inputs change
     useEffect(() => {
         checkImputationStatus();
-    }, [dataset, columns, selectedAlgorithm, target, maxIteration, sessionId, isUpdated]);
+    }, [dataset, columns, currentAlgorithm, target, maxIteration, sessionId, isUpdated]);
 
     // Automatically fetch cached data when algorithm changes and cache is available
     useEffect(() => {
         fetchCachedDataIfAvailable();
-    }, [selectedAlgorithm, target, maxIteration, sessionId]);
+    }, [currentAlgorithm, target, maxIteration, sessionId]);
 
     const checkImputationStatus = async () => {
         // Reset to false by default
@@ -137,7 +144,7 @@ const ImputationConfiguration: React.FC = () => {
 
         try {
             const resp = await fetchImputationStatus({
-                algo: selectedAlgorithm,
+                algo: currentAlgorithm,
                 columns: selectedColumns,
                 iterations: maxIteration,
             });
@@ -166,7 +173,7 @@ const ImputationConfiguration: React.FC = () => {
         try {
             // Check if cache exists
             const statusResp = await fetchImputationStatus({
-                algo: selectedAlgorithm,
+                algo: currentAlgorithm,
                 columns: selectedColumns,
                 iterations: maxIteration,
             });
@@ -180,7 +187,7 @@ const ImputationConfiguration: React.FC = () => {
             if (cacheExists) {
                 // Fetch the cached imputation data
                 const response = await runImputation({
-                    algo: selectedAlgorithm,
+                    algo: currentAlgorithm,
                     columns: selectedColumns,
                     iterations: maxIteration,
                 });
@@ -210,7 +217,7 @@ const ImputationConfiguration: React.FC = () => {
         setProgress(0);
         setLoading(true);
 
-        const duration = algorithmDurations[selectedAlgorithm];
+        const duration = algorithmDurations[currentAlgorithm];
         const start = Date.now();
 
         const timer = setInterval(() => {
@@ -225,7 +232,7 @@ const ImputationConfiguration: React.FC = () => {
 
         try {
             const response = await runImputation({
-                algo: selectedAlgorithm,
+                algo: currentAlgorithm,
                 columns: selectedColumns,
                 iterations: maxIteration,
             });
@@ -266,7 +273,7 @@ const ImputationConfiguration: React.FC = () => {
                     {algorithmsToRender.map((algo) => (
                         <div
                             key={algo}
-                            className={`${styles.algorithm} ${selectedAlgorithm === algo ? styles.selected : ''
+                            className={`${styles.algorithm} ${normalizedCurrentAlgorithm === algo ? styles.selected : ''
                                 }`}
                             onClick={() => {
                                 setSelectedAlgorithm(algo);
@@ -274,6 +281,9 @@ const ImputationConfiguration: React.FC = () => {
                                 setImputationReady(false);
                             }}
                         >
+                            {normalizedCurrentAlgorithm === algo && (
+                                <span style={{ color: '#1890ff', marginRight: '8px', fontWeight: 'bold' }}>●</span>
+                            )}
                             {algo}
                         </div>
                     ))}
